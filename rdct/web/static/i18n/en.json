@@ -1,0 +1,20 @@
+{
+  "lang": "Language",
+  "auth_title": "API Token",
+  "save": "Save",
+  "token_hint": "Token is required for /api/* endpoints.",
+  "status_title": "Status",
+  "refresh": "Refresh",
+  "stop": "Stop Run",
+  "run_title": "Run",
+  "mode": "Research mode",
+  "perf": "Performance",
+  "baseline": "Force baseline",
+  "start": "Start",
+  "reports_title": "Reports",
+  "load": "Load",
+  "loading": "Loading...",
+  "no_reports": "No reports yet.",
+  "download": "Download archive",
+  "no_archive": "No archive"
+}
