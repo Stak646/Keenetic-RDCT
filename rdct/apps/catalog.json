@@ -1,0 +1,97 @@
+{
+  "catalog_version": "1.0.0",
+  "apps": [
+    {
+      "app_id": "nfqws2-keenetic",
+      "name": "NFQWS2 for Keenetic (Entware)",
+      "github": {"owner": "nfqws", "repo": "nfqws2-keenetic"},
+      "install": {
+        "type": "opkg_feed",
+        "opkg_package": "nfqws2-keenetic",
+        "feed_file": "/opt/etc/opkg/nfqws2-keenetic.conf",
+        "feed_line": "src/gz nfqws2-keenetic https://nfqws.github.io/nfqws2-keenetic/all"
+      },
+      "detect": {
+        "opkg_packages": ["nfqws2-keenetic"],
+        "process_regex": ["\\bnfqws2\\b", "S51nfqws2"]
+      },
+      "initd": ["/opt/etc/init.d/S51nfqws2", "/opt/etc/init.d/nfqws2-keenetic"]
+    },
+    {
+      "app_id": "nfqws-keenetic-web",
+      "name": "NFQWS Keenetic Web UI (Entware)",
+      "github": {"owner": "nfqws", "repo": "nfqws-keenetic-web"},
+      "install": {
+        "type": "github_release_ipk",
+        "opkg_package": "nfqws-keenetic-web",
+        "asset_regex": "nfqws-keenetic-web_.*_all_entware\\.ipk$"
+      },
+      "detect": {
+        "opkg_packages": ["nfqws-keenetic-web"],
+        "process_regex": []
+      },
+      "initd": []
+    },
+    {
+      "app_id": "hydraroute",
+      "name": "HydraRoute (Keenetic)",
+      "github": {"owner": "Ground-Zerro", "repo": "HydraRoute"},
+      "install": {
+        "type": "opkg_feed_arch",
+        "opkg_package": "hydraroute",
+        "feed_file": "/opt/etc/opkg/hydraroute.conf",
+        "feed_name": "hydraroute",
+        "base_url": "https://ground-zerro.github.io/release/keenetic",
+        "arch_map": {
+          "aarch64-3.10": "aarch64-k3.10",
+          "mipsel-3.4": "mipsel-k3.4",
+          "mips-3.4": "mips-k3.4",
+          "armv7-3.2": "armv7-k3.2"
+        }
+      },
+      "detect": {
+        "opkg_packages": ["hydraroute"],
+        "process_regex": ["\\bhydraroute\\b"]
+      },
+      "initd": ["/opt/etc/init.d/S99hydraroute", "/opt/etc/init.d/hydraroute"]
+    },
+    {
+      "app_id": "magitrickle",
+      "name": "MagiTrickle (Entware/OpenWrt)",
+      "github": {"owner": "MagiTrickle", "repo": "MagiTrickle"},
+      "install": {
+        "type": "github_release_ipk_arch",
+        "opkg_package": "magitrickle",
+        "asset_template": "magitrickle_.*_entware_{arch}\\.ipk$",
+        "prefer_kn_variant": true
+      },
+      "detect": {
+        "opkg_packages": ["magitrickle"],
+        "process_regex": ["\\bmagitrickle\\b", "S99magitrickle"]
+      },
+      "initd": ["/opt/etc/init.d/S99magitrickle"]
+    },
+    {
+      "app_id": "awg-manager",
+      "name": "awg-manager (Entware web UI for AmneziaWG)",
+      "github": {"owner": "hoaxisr", "repo": "awg-manager"},
+      "install": {
+        "type": "opkg_custom_feed_append",
+        "opkg_package": "awg-manager",
+        "feed_file": "/opt/etc/opkg/custom.conf",
+        "feed_name": "keenetic_custom",
+        "base_url": "https://hoaxisr.github.io/entware-repo",
+        "arch_map": {
+          "mipsel-3.4": "mipsel-3.4-kn",
+          "mips-3.4": "mips-3.4-kn",
+          "aarch64-3.10": "aarch64-3.10-kn"
+        }
+      },
+      "detect": {
+        "opkg_packages": ["awg-manager"],
+        "process_regex": ["\\bawg-manager\\b"]
+      },
+      "initd": []
+    }
+  ]
+}

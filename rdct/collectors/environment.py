@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .base import BaseCollector, CollectorContext, CollectorMeta
-from ..utils import write_json
+from ..utils import utc_now_iso, write_json
 
 
 def _which(cmd: str) -> Optional[str]:
@@ -105,7 +105,24 @@ class EnvironmentDetectorCollector(BaseCollector):
         p3 = out_dir / "tools_inventory.json"
         write_json(p1, keeneticos)
         write_json(p2, entware)
-        write_json(p3, tools)
+
+        # TZ-friendly mirror paths
+        try:
+            write_json(ctx.snapshot_root / "keenetic" / "os.json", keeneticos)
+        except Exception:
+            pass
+        try:
+            write_json(ctx.snapshot_root / "entware" / "entware.json", entware)
+        except Exception:
+            pass
+        write_json(
+            p3,
+            {
+                "inventory_version": "1.0.0",
+                "collected_at": utc_now_iso(),
+                "tools": tools,
+            },
+        )
 
         result["stats"]["items_collected"] = 3
         result["stats"]["files_written"] = 3

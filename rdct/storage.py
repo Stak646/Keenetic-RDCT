@@ -108,11 +108,13 @@ class StorageLayout:
             "usb_only_enforced": True,
             "base_path": str(self.base_path),
             "install_dir": str(self.install_dir),
+            "config_dir": str(self.config_dir),
             "deps_dir": str(self.deps_dir),
             "cache_dir": str(self.cache_dir),
             "run_dir": str(self.run_dir),
             "reports_dir": str(self.reports_dir),
             "logs_dir": str(self.logs_dir),
+            "apps_dir": str(self.apps_dir),
             "free_space_before_bytes": int(self.free_space_before_bytes or 0),
             "free_space_after_bytes": int(self.free_space_after_bytes or 0) if self.free_space_after_bytes is not None else None,
             "filesystem": {
@@ -130,7 +132,9 @@ def build_layout(base_path: Path) -> StorageLayout:
     base_path = base_path.resolve()
     return StorageLayout(
         base_path=base_path,
-        install_dir=base_path,
+        # Keep tool files separate from data/config to simplify mirroring exclusions and upgrades.
+        # The installer places the RDCT package into <base>/install.
+        install_dir=base_path / "install",
         config_dir=base_path / "config",
         deps_dir=base_path / "deps",
         cache_dir=base_path / "cache",
@@ -166,8 +170,8 @@ def preflight_usb_only(layout: StorageLayout) -> StorageLayout:
                 f"Path {p} is not on {base_mi.mountpoint}."
             )
 
-    # Ensure directories exist and writable.
-    for p in [layout.deps_dir, layout.cache_dir, layout.run_dir, layout.reports_dir, layout.logs_dir, layout.config_dir, layout.apps_dir]:
+    # Ensure directories exist and writable (install_dir is included for completeness).
+    for p in [layout.install_dir, layout.deps_dir, layout.cache_dir, layout.run_dir, layout.reports_dir, layout.logs_dir, layout.config_dir, layout.apps_dir]:
         p.mkdir(parents=True, exist_ok=True)
         testfile = p / ".rdct_rw_test"
         try:
@@ -192,3 +196,20 @@ def usb_health_summary(layout: StorageLayout) -> str:
         f"USB mount: {layout.usb_device} on {layout.usb_mountpoint} "
         f"(fs={layout.filesystem_type}, free={human_bytes(free)}, ro={ro})"
     )
+
+
+def estimate_report_size_bytes(*, research_mode: str, mirror_enabled: bool) -> int:
+    """Very rough dry-run estimate of report size.
+
+    This is intentionally conservative and used only for preflight warnings.
+    """
+    rm = (research_mode or "light").lower()
+    base = {
+        "light": 25 * 1024 * 1024,
+        "medium": 80 * 1024 * 1024,
+        "full": 180 * 1024 * 1024,
+        "extreme": 300 * 1024 * 1024,
+    }.get(rm, 80 * 1024 * 1024)
+    if mirror_enabled:
+        base += 200 * 1024 * 1024
+    return int(base)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import shutil
 import threading
 import urllib.parse
 from http import HTTPStatus
@@ -11,7 +12,10 @@ from typing import Any, Dict, Optional
 
 from ..config import ConfigManager
 from ..core import RDCTCore
+from ..archive import create_redacted_export
 from ..storage import build_layout, preflight_usb_only
+from ..debugger import write_crash_report
+from ..apps import AppManager, AppManagerError
 from ..utils import stable_json_dumps, utc_now_iso
 
 
@@ -43,6 +47,7 @@ class RDCTService:
                 "running": running,
                 "run_result": self._run_result,
                 "run_error": self._run_error,
+                "progress": self.core.progress(),
             }
 
     def start_run(self, mode: Optional[str], perf: Optional[str], baseline: bool, initiator: str = "webui") -> Dict[str, Any]:
@@ -67,6 +72,10 @@ class RDCTService:
                             "manifest_path": str(rr.manifest_path),
                         }
                 except Exception as e:
+                    try:
+                        write_crash_report(self.layout.logs_dir / "crash", e, context={"cmd": "serve/run", "base": str(self.base_path)})
+                    except Exception:
+                        pass
                     with self._lock:
                         self._run_error = str(e)
 
@@ -119,6 +128,50 @@ class RDCTService:
             return None
         return p
 
+    def export_report(self, run_id: str, *, level: str = "strict") -> Dict[str, Any]:
+        snap = self.layout.reports_dir / run_id / "snapshot"
+        if not snap.exists():
+            return {"ok": False, "error": "snapshot_not_found"}
+        out_dir = self.layout.reports_dir / run_id / "exports"
+        try:
+            out = create_redacted_export(snapshot_root=snap, out_dir=out_dir, level=level)
+            return {"ok": True, "export_path": str(out), "level": level}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def delete_report(self, run_id: str) -> Dict[str, Any]:
+        d = (self.layout.reports_dir / run_id).resolve()
+        try:
+            d.relative_to(self.layout.reports_dir.resolve())
+        except Exception:
+            return {"ok": False, "error": "invalid_run_id"}
+        if not d.exists() or not d.is_dir():
+            return {"ok": False, "error": "not_found"}
+        try:
+            shutil.rmtree(d)
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    # ---- App Manager (allowlist) ----
+
+    def apps_catalog(self) -> Dict[str, Any]:
+        mgr = AppManager(self.base_path)
+        return {"items": mgr.load_catalog()}
+
+    def apps_status(self) -> Dict[str, Any]:
+        mgr = AppManager(self.base_path)
+        sts = [s.__dict__ for s in mgr.list_status()]
+        return {"count": len(sts), "items": sts}
+
+    def apps_install(self, app_id: str) -> Dict[str, Any]:
+        mgr = AppManager(self.base_path)
+        return mgr.install(app_id)
+
+    def apps_update(self, app_id: str) -> Dict[str, Any]:
+        mgr = AppManager(self.base_path)
+        return mgr.update(app_id)
+
 
 class RDCTHandler(BaseHTTPRequestHandler):
     server_version = "RDCTHTTP/1.0"
@@ -136,9 +189,57 @@ class RDCTHandler(BaseHTTPRequestHandler):
         if path == "/api/v1/status":
             self._json({"ok": True, "status": svc.status()})
             return
+        if path == "/api/v1/plan":
+            # Return adaptive plan for the most recent run (best-effort)
+            run_id = None
+            st = svc.status()
+            if isinstance(st.get("run_result"), dict):
+                run_id = st["run_result"].get("run_id")
+            if not run_id:
+                reps = svc.list_reports()
+                if reps:
+                    run_id = reps[0].get("run_id")
+            if not run_id:
+                self._json({"ok": False, "error": "no_reports"}, status=HTTPStatus.NOT_FOUND)
+                return
+            plan_path = svc.layout.reports_dir / str(run_id) / "snapshot" / "adaptive" / "plan.json"
+            if not plan_path.exists():
+                self._json({"ok": False, "error": "plan_not_found"}, status=HTTPStatus.NOT_FOUND)
+                return
+            try:
+                self._json({"ok": True, "run_id": run_id, "plan": json.loads(plan_path.read_text(encoding="utf-8"))})
+                return
+            except Exception:
+                self._json({"ok": False, "error": "plan_read_error"}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+                return
+        if path == "/api/v1/progress":
+            self._json({"ok": True, "progress": svc.core.progress()})
+            return
+        if path == "/api/v1/apps":
+            self._json({"ok": True, "catalog": svc.apps_catalog(), "status": svc.apps_status()})
+            return
+        if path == "/api/v1/apps/status":
+            self._json({"ok": True, "status": svc.apps_status()})
+            return
         if path == "/api/v1/reports":
             self._json({"ok": True, "reports": svc.list_reports()})
             return
+
+        # /api/v1/reports/<run_id> -> return manifest
+        if path.startswith("/api/v1/reports/"):
+            parts = [p for p in path.split("/") if p]
+            if len(parts) == 4 and parts[0] == "api" and parts[1] == "v1" and parts[2] == "reports":
+                run_id = parts[3]
+                mp = svc.layout.reports_dir / run_id / "snapshot" / "manifest.json"
+                if mp.exists():
+                    try:
+                        self._json({"ok": True, "manifest": json.loads(mp.read_text(encoding="utf-8"))})
+                        return
+                    except Exception:
+                        self._json({"ok": False, "error": "manifest_read_error"}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+                        return
+                self._json({"ok": False, "error": "not_found"}, status=HTTPStatus.NOT_FOUND)
+                return
         if path.startswith("/api/v1/reports/") and path.endswith("/manifest"):
             run_id = path.split("/")[4]
             m = svc.read_manifest(run_id)
@@ -215,6 +316,14 @@ class RDCTHandler(BaseHTTPRequestHandler):
         if path == "/api/v1/run/stop":
             self._json(svc.stop_run())
             return
+        if path == "/api/v1/run/pause":
+            svc.request_pause()
+            self._json({"ok": True})
+            return
+        if path == "/api/v1/run/resume":
+            svc.request_resume()
+            self._json({"ok": True})
+            return
         if path == "/api/v1/config":
             # Update config (best-effort, safe subset)
             cfg = svc.cfg_mgr.load_or_create()
@@ -224,6 +333,46 @@ class RDCTHandler(BaseHTTPRequestHandler):
             svc.cfg_mgr.save(cfg)
             svc.reload_config()
             self._json({"ok": True})
+            return
+
+        if path.startswith("/api/v1/reports/"):
+            parts = [p for p in path.split("/") if p]
+            if len(parts) == 5 and parts[0] == "api" and parts[1] == "v1" and parts[2] == "reports":
+                run_id = parts[3]
+                action = parts[4]
+                if action == "export":
+                    body = self._read_json()
+                    level = "strict"
+                    if isinstance(body, dict) and body.get("level"):
+                        level = str(body.get("level"))
+                    self._json(svc.export_report(run_id, level=level))
+                    return
+                if action == "delete":
+                    self._json(svc.delete_report(run_id))
+                    return
+            self._json({"ok": False, "error": "not_found"}, status=HTTPStatus.NOT_FOUND)
+            return
+
+        if path.startswith("/api/v1/apps/"):
+            # /api/v1/apps/<app_id>/install | update
+            parts = [p for p in path.split("/") if p]
+            if len(parts) == 5 and parts[0] == "api" and parts[1] == "v1" and parts[2] == "apps":
+                app_id = parts[3]
+                action = parts[4]
+                try:
+                    if action == "install":
+                        res = svc.apps_install(app_id)
+                        self._json({"ok": True, "result": res})
+                        return
+                    if action == "update":
+                        res = svc.apps_update(app_id)
+                        self._json({"ok": True, "result": res})
+                        return
+                except AppManagerError as e:
+                    self._json({"ok": False, "error": str(e)}, status=HTTPStatus.BAD_REQUEST)
+                    return
+
+            self._json({"ok": False, "error": "not_found"}, status=HTTPStatus.NOT_FOUND)
             return
 
         self._json({"ok": False, "error": "not_found"}, status=HTTPStatus.NOT_FOUND)

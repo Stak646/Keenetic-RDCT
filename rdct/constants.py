@@ -20,7 +20,7 @@ SUPPORTED_ARCH = ["mipsel", "mips", "aarch64"]
 SUPPORTED_LANGUAGES = ["ru", "en"]
 
 # Snapshot / JSON formats
-MANIFEST_VERSION = "1.1.0"
+MANIFEST_VERSION = "1.2.0"
 RESULT_VERSION = "1.1.0"
 ERRORS_VERSION = "1.1.0"
 DIFF_VERSION = "1.0.0"

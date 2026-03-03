@@ -10,6 +10,14 @@ from ..utils import sha256_text, utc_now_iso, write_json
 
 
 _APP_PATTERNS = [
+    # Allowlist-first (TZ requirement): these app_ids should align with config.allowlist.apps
+    ("nfqws2-keenetic", re.compile(r"\bnfqws2\b|\bnfqws2-keenetic\b|S51nfqws2\b")),
+    ("nfqws-keenetic-web", re.compile(r"\bnfqws-keenetic-web\b|\bnfqws_web\b|nfqws_web\.conf")),
+    ("hydraroute", re.compile(r"\bhydraroute\b|\bHydraRoute\b")),
+    ("magitrickle", re.compile(r"\bmagitrickle\b|S99magitrickle\b")),
+    ("awg-manager", re.compile(r"\bawg-manager\b|\bAWG\b")),
+
+    # Generic ecosystem apps
     ("nfqws", re.compile(r"\bnfqws\b")),
     ("redsocks", re.compile(r"\bredsocks\b")),
     ("dnscrypt-proxy", re.compile(r"\bdnscrypt-proxy\b")),

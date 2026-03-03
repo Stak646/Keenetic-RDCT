@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from ..utils import CommandResult, redact_text, sha256_file, utc_now_iso, write_json
 from ..constants import ERRORS_VERSION, RESULT_VERSION
+from ..storage import StorageLayout
 
 
 @dataclasses.dataclass
@@ -21,6 +22,10 @@ class CollectorMeta:
     category: str
     requires_root: bool = False
     default_enabled: bool = True
+    # Optional advisory levels (1..3) used by policy/adaptive planning.
+    # Not all collectors set these explicitly.
+    risk_level: int = 1
+    cost_level: int = 1
 
 
 @dataclasses.dataclass
@@ -35,6 +40,8 @@ class CollectorContext:
     limits: Dict[str, Any]
     tool_logger: Any  # logging.Logger
     signals: Dict[str, Any]
+    config: Dict[str, Any]
+    layout: StorageLayout
     stop_requested_flag: Any  # callable returning bool
 
     def should_stop(self) -> bool:
@@ -89,6 +96,7 @@ class BaseCollector:
             "type": type_,
             "size_bytes": int(path.stat().st_size),
             "sha256": sha,
+            "created_at": utc_now_iso(),
             "sensitive": bool(sensitive),
             "redacted": bool(redacted),
             "description": description or None,
@@ -194,6 +202,9 @@ class BaseCollector:
                 "name": self.META.name,
                 "version": self.META.version,
                 "collector_id": self.META.collector_id,
+                "category": self.META.category,
+                "risk_level": int(getattr(self.META, "risk_level", 1) or 1),
+                "cost_level": int(getattr(self.META, "cost_level", 1) or 1),
             },
             "run": {
                 "run_id": ctx.run_id,
@@ -201,6 +212,12 @@ class BaseCollector:
                 "end_time": None,
                 "duration_ms": None,
                 "status": status,
+                "resource_usage": {
+                    "cpu_time_ms": None,
+                    "max_rss_kb": None,
+                    "io_read_bytes": None,
+                    "io_write_bytes": None,
+                },
             },
             "scope": {
                 "research_mode": ctx.research_mode,

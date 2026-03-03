@@ -10,6 +10,39 @@ from .base import BaseCollector, CollectorContext, CollectorMeta
 from ..utils import sha256_text, utc_now_iso, write_json
 
 
+def parse_cpuinfo_text(cpuinfo: str) -> Dict[str, object]:
+    """Best-effort CPU info for embedded Linux."""
+    cpu: Dict[str, object] = {"model": None, "cores": None, "features": None}
+    if not cpuinfo:
+        return cpu
+    lines = cpuinfo.splitlines()
+
+    cores = 0
+    for ln in lines:
+        if ln.lower().startswith("processor") and ":" in ln:
+            cores += 1
+    cpu["cores"] = cores or None
+
+    model = None
+    for key in ("model name", "hardware", "system type", "cpu model"):
+        for ln in lines:
+            if ln.lower().startswith(key) and ":" in ln:
+                model = ln.split(":", 1)[1].strip()
+                break
+        if model:
+            break
+    cpu["model"] = model
+
+    feats = None
+    for ln in lines:
+        if ln.lower().startswith("features") and ":" in ln:
+            feats = ln.split(":", 1)[1].strip()
+            break
+    cpu["features"] = feats
+
+    return cpu
+
+
 class DeviceInfoCollector(BaseCollector):
     META = CollectorMeta(
         collector_id="mvp-01-device-info",
@@ -94,14 +127,26 @@ class DeviceInfoCollector(BaseCollector):
         except Exception:
             pass
 
+        mem_total_bytes = int(total_kb * 1024) if total_kb is not None else None
+        mem_avail_bytes = int(avail_kb * 1024) if avail_kb is not None else None
+
         device_info = {
-            "model": model,
+            "collected_at": utc_now_iso(),
+            "hostname": socket.gethostname(),
+            "vendor": "Keenetic",
+            "model": model or None,
+            "arch": arch,
             "architecture": arch,
+            "kernel": getattr(os.uname(), "release", None),
+            "cpu": parse_cpuinfo_text(cpuinfo),
             "uname": uname.strip(),
             "cpuinfo_sha256": sha256_text(cpuinfo) if cpuinfo else None,
+            # Keep both flat and nested memory fields for compatibility
+            "mem_total_bytes": mem_total_bytes,
+            "mem_available_bytes": mem_avail_bytes,
             "memory": {
-                "total_bytes": int(total_kb * 1024) if total_kb is not None else None,
-                "available_bytes": int(avail_kb * 1024) if avail_kb is not None else None,
+                "total_bytes": mem_total_bytes,
+                "available_bytes": mem_avail_bytes,
             },
             "uptime_seconds": uptime_seconds,
         }

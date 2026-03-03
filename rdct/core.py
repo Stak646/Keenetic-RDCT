@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import resource
 import shutil
 import threading
@@ -104,6 +105,20 @@ class RDCTCore:
         self.logger.info("Preflight: enforcing USB-only storage layout.")
         layout = preflight_usb_only(self.layout)
         self.logger.info(usb_health_summary(layout))
+
+        # Dry-run estimate of a typical report size for user awareness.
+        try:
+            modes = self.config.get("modes", {}) or {}
+            rm = str(modes.get("research_mode") or "light")
+            mirror_enabled = bool((modes.get("mirror_policy", {}) or {}).get("enabled", False))
+            from .storage import estimate_report_size_bytes
+
+            est = estimate_report_size_bytes(research_mode=rm, mirror_enabled=mirror_enabled)
+            from .utils import human_bytes
+
+            self.logger.info(f"Dry-run estimate: expected report size ~{human_bytes(est)}")
+        except Exception:
+            pass
         return layout
 
     def run(
@@ -179,6 +194,16 @@ class RDCTCore:
         signals["storage.reports_dir"] = str(self.layout.reports_dir)
         signals["storage.logs_dir"] = str(self.layout.logs_dir)
 
+        # Preflight estimate (used by adaptive rules and UI warnings)
+        try:
+            from .storage import estimate_report_size_bytes
+
+            mirror_enabled = bool((modes.get("mirror_policy", {}) or {}).get("enabled", False))
+            est = estimate_report_size_bytes(research_mode=research_mode, mirror_enabled=mirror_enabled)
+            signals["preflight.estimated_report_bytes"] = int(est)
+        except Exception:
+            pass
+
         # Core-level quick metrics
         self._populate_quick_signals(signals)
 
@@ -193,6 +218,8 @@ class RDCTCore:
             limits=self.config.get("limits", {}) or {},
             tool_logger=self.logger,
             signals=signals,
+            config=self.config,
+            layout=self.layout,
             stop_requested_flag=self.stop_requested,
         )
 
@@ -471,6 +498,10 @@ class RDCTCore:
             "meta",
             "device",
             "environment",
+            # TZ-required roots
+            "keenetic",
+            "entware",
+            "sandbox",
             "system",
             "network",
             "security",
@@ -481,6 +512,7 @@ class RDCTCore:
             "diff",
             "reports",
             "adaptive",
+            "logs",
             "logs/collectors",
             "logs/tool",
         ]:
@@ -763,20 +795,23 @@ class RDCTCore:
                 req_root = bool(getattr(meta.META, "requires_root", False)) if meta else False
 
             run = r.get("run", {}) or {}
+            # errors.json is optional (only written if errors/warnings exist)
+            errors_rel = f"logs/collectors/{cid}/errors.json"
+            errors_path = errors_rel if (ctx.snapshot_root / errors_rel).exists() else None
             collectors_manifest.append(
                 {
-                    "collector_id": cid,
+                    "id": cid,
                     "name": name,
                     "version": ver,
                     "category": cat,
-                    "requires_root": req_root,
                     "enabled": True,
-                    "start_time": run.get("start_time"),
-                    "end_time": run.get("end_time"),
+                    "requires_root": req_root,
+                    "started_at": run.get("start_time"),
+                    "finished_at": run.get("end_time"),
                     "duration_ms": run.get("duration_ms"),
                     "status": run.get("status"),
                     "result_path": f"logs/collectors/{cid}/result.json",
-                    "errors_path": f"logs/collectors/{cid}/errors.json",
+                    "errors_path": errors_path,
                     "artifacts_refs": [a.get("artifact_id") for a in (r.get("artifacts") or []) if a.get("artifact_id")],
                     "resource_usage": run.get("resource_usage"),
                     "notes": [],
@@ -795,6 +830,7 @@ class RDCTCore:
                         "producer": cid,
                         "size_bytes": a.get("size_bytes"),
                         "sha256": a.get("sha256"),
+                        "created_at": a.get("created_at"),
                         "sensitive": bool(a.get("sensitive", False)),
                         "redacted": bool(a.get("redacted", False)),
                         "description": a.get("description"),
@@ -811,6 +847,39 @@ class RDCTCore:
         mirror_policy = self.config.get("modes", {}).get("mirror_policy", {}) or {}
         network_policy = self.config.get("modes", {}).get("network_policy", {}) or {}
 
+        # Tools inventory can be stored as list (collector writes a list) or as {"tools": [...]}
+        tools_list = None
+        if isinstance(env_tools, list):
+            tools_list = env_tools
+        elif isinstance(env_tools, dict):
+            tools_list = env_tools.get("tools")
+
+        # Normalize passes for manifest schema
+        passes_out: List[Dict[str, Any]] = []
+        for i, p in enumerate(passes):
+            pid_raw = str(p.get("pass_id") or "")
+            m = re.search(r"(\d+)", pid_raw)
+            pid = int(m.group(1)) if m else int(i + 1)
+            passes_out.append(
+                {
+                    "pass_id": pid,
+                    "name": p.get("description") or f"pass{pid}",
+                    "started_at": p.get("start_time"),
+                    "finished_at": p.get("end_time"),
+                    "status": p.get("status"),
+                    "collectors_run": p.get("collectors") or [],
+                    "triggered_by": p.get("triggered_by") or [],
+                    "notes": p.get("notes") or [],
+                }
+            )
+
+        idx = self.index_mgr.load() if bool(inc_policy.get("enabled", True)) else {}
+        baseline_run_id = idx.get("baseline_run_id") if isinstance(idx, dict) else None
+        is_baseline = bool(baseline_run_id == ctx.run_id)
+        baseline_path = None
+        if baseline_run_id and (ctx.snapshot_root / "incremental" / f"{baseline_run_id}.baseline.normalized.json").exists():
+            baseline_path = f"incremental/{baseline_run_id}.baseline.normalized.json"
+
         manifest: Dict[str, Any] = {
             "manifest_version": MANIFEST_VERSION,
             "tool": {
@@ -823,61 +892,69 @@ class RDCTCore:
             },
             "run": {
                 "run_id": ctx.run_id,
-                "start_time": run_started_at,
-                "end_time": run_ended_at,
+                "started_at": run_started_at,
+                "finished_at": run_ended_at,
                 "duration_ms": int(duration_ms),
                 "status": status,
                 "initiator": initiator,
-                "mode": run_mode,
+                "requested_modes": {"research_mode": run_mode, "performance_mode": ctx.performance_mode},
+                "effective_modes": {"research_mode": ctx.research_mode, "performance_mode": ctx.performance_mode},
                 "operator_actions": [],
             },
             "device": {
                 "hostname": device_info.get("hostname"),
                 "vendor": device_info.get("vendor"),
-                "model": device_info.get("model") or device_info.get("arch"),
+                "model": device_info.get("model") or "unknown",
                 "architecture": device_info.get("arch") or device_info.get("architecture"),
-                "os": {
-                    "name": "KeeneticOS" if keeneticos else device_info.get("os", {}).get("name") or "unknown",
-                    "version": keeneticos.get("version") if keeneticos else device_info.get("os", {}).get("version"),
-                    "build": keeneticos.get("build") if keeneticos else None,
+                "firmware": {
+                    "name": "KeeneticOS" if keeneticos else (device_info.get("os", {}) or {}).get("name") or "unknown",
+                    "version": keeneticos.get("version") if isinstance(keeneticos, dict) else (device_info.get("os", {}) or {}).get("version"),
+                    "build": keeneticos.get("build") if isinstance(keeneticos, dict) else None,
                 },
+                "kernel": device_info.get("kernel") or None,
+                "cpu": device_info.get("cpu") or None,
                 "memory": {
                     "total_bytes": device_info.get("mem_total_bytes"),
                     "available_bytes": device_info.get("mem_available_bytes"),
                 },
-                "storage": {
-                    "usb_mountpoint": self.layout.usb_mountpoint,
-                    "usb_device": self.layout.usb_device,
-                },
+                "uptime_seconds": device_info.get("uptime_seconds"),
+                "serial_redacted": None,
             },
             "environment": {
-                "keeneticos": keeneticos or None,
-                "entware": entware or None,
-                "tools_inventory": (env_tools.get("tools") if isinstance(env_tools, dict) else None),
-            },
-            "modes": {
-                "research_mode": ctx.research_mode,
-                "performance_mode": ctx.performance_mode,
-                "redaction": {"enabled": ctx.redaction_enabled, "level": ctx.redaction_level},
-                "mirror_policy": mirror_policy,
-                "adaptive_policy": adaptive_policy,
-                "incremental_policy": inc_policy,
-                "network_policy": network_policy,
+                "keenetic": keeneticos if isinstance(keeneticos, dict) else None,
+                "entware": entware if isinstance(entware, dict) else None,
+                "tools": tools_list,
             },
             "storage": self.layout.as_dict(),
-            "dependencies": {
-                "auto_install_enabled": bool(self.config.get("dependencies", {}).get("auto_install_enabled", True)),
-                "cleanup_after_run_enabled": bool(self.config.get("dependencies", {}).get("cleanup_after_run_enabled", False)),
-                "offline_mode_used": bool(self.config.get("dependencies", {}).get("offline_mode_forced", False)),
-                "installed_by_tool": [],
-                "install_log_path": "logs/tool/deps_install.log",
-                "cleanup_log_path": "logs/tool/deps_cleanup.log",
-            },
             "modules": [
-                {"module_id": "core", "version": TOOL_VERSION, "status": "active", "start_time": run_started_at, "end_time": run_ended_at, "notes": []},
-                {"module_id": "collectors", "version": TOOL_VERSION, "status": "active", "start_time": run_started_at, "end_time": run_ended_at, "notes": []},
-                {"module_id": "policy_engine", "version": "1.0.0", "status": "active" if bool(adaptive_policy.get("enabled", True)) else "disabled", "notes": []},
-                {"module_id": "incremental", "version": "1.1.0", "status": "active" if bool(inc_policy.get("enabled", True)) else "disabled", "notes": []},
+                {
+                    "name": "core",
+                    "version": TOOL_VERSION,
+                    "status": "ok" if status == "success" else ("failed" if status == "failed" else "skipped"),
+                    "started_at": run_started_at,
+                    "finished_at": run_ended_at,
+                    "notes": [],
+                },
+                {
+                    "name": "collectors",
+                    "version": TOOL_VERSION,
+                    "status": "ok" if status == "success" else ("failed" if status == "failed" else "skipped"),
+                    "started_at": run_started_at,
+                    "finished_at": run_ended_at,
+                    "notes": [],
+                },
+                {
+                    "name": "policy_engine",
+                    "version": "1.0.0",
+                    "status": "ok" if bool(adaptive_policy.get("enabled", True)) else "skipped",
+                    "notes": [],
+                },
+                {
+                    "name": "incremental",
+                    "version": "1.1.0",
+                    "status": "ok" if bool(inc_policy.get("enabled", True)) else "skipped",
+                    "notes": [],
+                },
             ],
             "collectors": collectors_manifest,
             "artifacts": artifacts_manifest,
@@ -896,18 +973,17 @@ class RDCTCore:
                 "enabled": bool(adaptive_policy.get("enabled", True)),
                 "plan_path": plan_rel,
                 "executed_actions": adaptive_executed_actions,
-                "suggested_actions": (plan.get("suggested_actions") if isinstance(plan, dict) else []) if plan_rel else [],
-                "skipped_count": None,
             },
             "incremental": {
                 "enabled": bool(inc_policy.get("enabled", True)),
-                "mode": run_mode,
-                "baseline_run_id": self.index_mgr.load().get("baseline_run_id"),
+                "is_baseline": is_baseline,
+                "baseline_run_id": baseline_run_id,
+                "baseline_path": baseline_path,
                 "index_path": "incremental/index.json" if bool(inc_policy.get("enabled", True)) else None,
                 "normalized_path": f"incremental/{ctx.run_id}.normalized.json" if bool(inc_policy.get("enabled", True)) else None,
                 "diff_report_path": diff_report_path,
+                "passes": passes_out,
             },
-            "passes": passes,
             "summary": {
                 "errors_count": int(errors_count),
                 "warnings_count": int(warnings_count),
@@ -916,11 +992,21 @@ class RDCTCore:
                 "recommendations_path": "reports/recommendations.json",
                 "aborted_reason": "stop_requested" if self.stop_requested() else None,
             },
-            "extensions": {},
+            "extensions": {
+                "modes": {
+                    "research_mode": ctx.research_mode,
+                    "performance_mode": ctx.performance_mode,
+                    "redaction": {"enabled": ctx.redaction_enabled, "level": ctx.redaction_level},
+                    "mirror_policy": mirror_policy,
+                    "adaptive_policy": adaptive_policy,
+                    "incremental_policy": inc_policy,
+                    "network_policy": network_policy,
+                },
+            },
         }
         return manifest
 
-    def _safe_read_json(self, path: Path) -> Optional[Dict[str, Any]]:
+    def _safe_read_json(self, path: Path) -> Any:
         try:
             if not path.exists():
                 return None

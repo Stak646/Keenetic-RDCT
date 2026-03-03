@@ -95,7 +95,15 @@ def default_config(base_path: Path) -> Dict[str, Any]:
             "require_confirmation_for_risky": True,
         },
         "allowlist": {
-            "apps": [],
+            # Allowlist is strict: only known/supported apps are expected.
+            # This list is also referenced by the allowlist_apps collector.
+            "apps": [
+                "nfqws2-keenetic",
+                "nfqws-keenetic-web",
+                "hydraroute",
+                "magitrickle",
+                "awg-manager",
+            ],
         },
         "exports": {
             "default_redaction_level": "strict",

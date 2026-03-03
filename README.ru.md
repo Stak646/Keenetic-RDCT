@@ -29,6 +29,34 @@
 
 ## Быстрый старт (CLI)
 
+### Установка с GitHub одной командой (рекомендуется)
+
+Запусти **одну команду** на роутере (скрипт скачает RDCT на USB и создаст `rdct.sh` в базовой папке):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/<OWNER>/<REPO>/main/install.sh | \
+  RDCT_GH_OWNER=<OWNER> RDCT_GH_REPO=<REPO> sh
+```
+
+Опционально:
+
+- явно указать путь на USB:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/<OWNER>/<REPO>/main/install.sh | \
+  RDCT_GH_OWNER=<OWNER> RDCT_GH_REPO=<REPO> RDCT_BASE=/tmp/mnt/sda1/rdct sh
+```
+
+После установки:
+
+```sh
+/tmp/mnt/sda1/rdct/rdct.sh preflight
+/tmp/mnt/sda1/rdct/rdct.sh run --mode light
+/tmp/mnt/sda1/rdct/rdct.sh serve --bind 0.0.0.0 --port 8080
+```
+
+### Запуск напрямую (для разработки / локально)
+
 > На роутере нужен Python 3 (обычно в Entware: `/opt/bin/python3`).
 
 ```sh

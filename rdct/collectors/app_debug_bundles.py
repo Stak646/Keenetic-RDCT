@@ -15,6 +15,46 @@ _APP_PATHS: Dict[str, List[Path]] = {
     "xray": [Path("/opt/etc/xray"), Path("/etc/xray")],
     "sing-box": [Path("/opt/etc/sing-box"), Path("/etc/sing-box")],
     "nfqws": [Path("/opt/etc/nfqws"), Path("/etc/nfqws")],
+
+    # Allowlist apps (TZ): best-effort common paths on Keenetic/Entware
+    "nfqws2-keenetic": [
+        Path("/opt/etc/nfqws2"),
+        Path("/etc/nfqws2"),
+        Path("/opt/etc/init.d/S51nfqws2"),
+        Path("/opt/var/log/nfqws2"),
+        Path("/opt/var/log/nfqws2.log"),
+    ],
+    "nfqws-keenetic-web": [
+        Path("/opt/etc/nfqws-web"),
+        Path("/opt/etc/nfqws_web"),
+        Path("/opt/etc/init.d/S52nfqws-web"),
+        Path("/opt/var/log/nfqws-web"),
+        Path("/opt/var/log/nfqws-web.log"),
+        Path("/opt/var/www/nfqws"),
+        Path("/opt/var/www/nfqws-web"),
+    ],
+    "hydraroute": [
+        Path("/opt/etc/hydraroute"),
+        Path("/etc/hydraroute"),
+        Path("/opt/etc/init.d/S99hydraroute"),
+        Path("/opt/var/log/hydraroute"),
+        Path("/opt/var/log/hydraroute.log"),
+    ],
+    "magitrickle": [
+        Path("/opt/etc/magitrickle"),
+        Path("/etc/magitrickle"),
+        Path("/opt/etc/init.d/S99magitrickle"),
+        Path("/opt/var/log/magitrickle"),
+        Path("/opt/var/log/magitrickle.log"),
+    ],
+    "awg-manager": [
+        Path("/opt/etc/awg-manager"),
+        Path("/opt/etc/awg_manager"),
+        Path("/opt/etc/init.d/S99awg-manager"),
+        Path("/opt/var/log/awg-manager"),
+        Path("/opt/var/log/awg-manager.log"),
+        Path("/opt/var/log/awg-manager-error.log"),
+    ],
 }
 
 
