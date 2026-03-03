@@ -19,6 +19,24 @@ from .summary import SummaryCollector
 from .checksums import ChecksumsCollector
 from .diff import DiffCollector
 
+# Extended collectors (opt-in via policy/config)
+from .firewall import FirewallCollector
+from .conntrack import ConntrackCollector
+from .dns import DNSCollector
+from .dhcp import DHCPCollector
+from .wifi import WiFiCollector
+from .vpn import VPNCollector
+from .file_security import FileSecurityInventoryCollector
+from .recent_changes import RecentChangesCollector
+from .large_files import LargeFilesCollector
+from .app_inventory import AppInventoryCollector
+from .app_debug_bundles import AppDebugBundlesCollector
+from .allowlist_apps import AllowlistAppsCollector
+from .timeline import TimelineCollector
+from .performance_profile import PerformanceProfileCollector
+from .sandbox_tests import SandboxTestsCollector
+from .js_api_extractor import JSApiExtractorCollector
+
 
 from typing import List, Dict
 
@@ -43,6 +61,24 @@ def default_collectors() -> List[BaseCollector]:
         SummaryCollector(),
         DiffCollector(),
         ChecksumsCollector(),
+
+        # Extended
+        FirewallCollector(),
+        ConntrackCollector(),
+        DNSCollector(),
+        DHCPCollector(),
+        WiFiCollector(),
+        VPNCollector(),
+        FileSecurityInventoryCollector(),
+        RecentChangesCollector(),
+        LargeFilesCollector(),
+        AppInventoryCollector(),
+        AppDebugBundlesCollector(),
+        AllowlistAppsCollector(),
+        TimelineCollector(),
+        PerformanceProfileCollector(),
+        SandboxTestsCollector(),
+        JSApiExtractorCollector(),
     ]
 
 

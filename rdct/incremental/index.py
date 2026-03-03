@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Tuple
 from ..utils import stable_json_dumps, utc_now_iso, write_json
 
 
-INDEX_VERSION = "1.0.0"
+INDEX_VERSION = "1.1.0"
 
 
 class IndexManager:
@@ -25,6 +25,7 @@ class IndexManager:
                 "updated_at": utc_now_iso(),
                 "baseline_run_id": None,
                 "runs": {},
+                "file_index": {},
             }
         return json.loads(self.index_path.read_text(encoding="utf-8"))
 
@@ -53,6 +54,8 @@ class IndexManager:
             "normalized_path": str(run_norm_path.relative_to(self.cache_dir)),
             "snapshot_relpath": snapshot_relpath,
         }
+        # Keep an optional evolving index of observed filesystem objects (best-effort).
+        idx.setdefault("file_index", {})
         if mode == "baseline":
             idx["baseline_run_id"] = run_id
         return idx

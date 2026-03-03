@@ -6,4 +6,6 @@ See docs/ for architecture and format details.
 """
 
 __all__ = ["__version__"]
-__version__ = "0.1.0"
+
+# Keep the public version in sync with rdct.constants.TOOL_VERSION
+__version__ = "0.3.0"

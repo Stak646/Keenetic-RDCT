@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .base import BaseCollector, CollectorContext, CollectorMeta
-from ..utils import sha256_text, write_json
+from ..utils import sha256_text, utc_now_iso, write_json
 
 
 class DeviceInfoCollector(BaseCollector):
@@ -32,7 +32,7 @@ class DeviceInfoCollector(BaseCollector):
             cr = self._run_cmd(ctx, ["uname", "-a"])
             uname = Path(cr.stdout_path).read_text(encoding="utf-8", errors="ignore") if cr.stdout_path else ""
         except Exception as e:
-            warnings.append({"time": ctx.signals.get("now") or "", "level": "warning", "code": "uname_failed", "message": str(e)})
+            warnings.append({"time": utc_now_iso(), "level": "warning", "code": "uname_failed", "message": str(e)})
 
         # cpuinfo / meminfo
         cpuinfo = ""
@@ -112,15 +112,15 @@ class DeviceInfoCollector(BaseCollector):
         result["stats"]["items_collected"] = 1
         result["stats"]["files_written"] = 1
         result["stats"]["bytes_written"] = out_path.stat().st_size
-        result["artifacts"].append({
-            "path": str(out_path.relative_to(ctx.snapshot_root)),
-            "type": "json",
-            "size_bytes": out_path.stat().st_size,
-            "sha256": None,
-            "sensitive": False,
-            "redacted": False,
-            "description": "Basic device information",
-        })
+        result["artifacts"].append(self._register_artifact(
+            ctx,
+            path=out_path,
+            type_="json",
+            sensitive=False,
+            redacted=False,
+            description="Basic device information",
+            tags=["device"],
+        ))
         result["normalized_data"] = {
             "device_signature": sha256_text(f"{model}|{arch}|{device_info.get('uname','')}"),
         }

@@ -68,15 +68,15 @@ class NDMEventsHooksCollector(BaseCollector):
             (hooks_path, "json", "NDM hooks inventory (placeholder)"),
             (comps_path, "json", "NDM components inventory (placeholder)"),
         ]:
-            result["artifacts"].append({
-                "path": str(p.relative_to(ctx.snapshot_root)),
-                "type": typ,
-                "size_bytes": p.stat().st_size,
-                "sha256": None,
-                "sensitive": True if typ == "text" else False,
-                "redacted": bool(ctx.redaction_enabled and typ == "text" and ctx.research_mode in {"light","medium"}),
-                "description": desc,
-            })
+            result["artifacts"].append(self._register_artifact(
+                ctx,
+                path=p,
+                type_=typ,
+                sensitive=(typ == "text"),
+                redacted=bool(ctx.redaction_enabled and typ == "text" and ctx.research_mode in {"light", "medium"}),
+                description=desc,
+                tags=["keenetic", "ndm"],
+            ))
 
         self._finalize_result(ctx, result, started)
         self.write_result_json(ctx, result)

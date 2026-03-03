@@ -51,15 +51,15 @@ class StorageMountDfCollector(BaseCollector):
         result["stats"]["bytes_written"] = p_mount.stat().st_size + p_df.stat().st_size + p_sum.stat().st_size
 
         for p, typ, desc in [(p_mount, "text", "mount output"), (p_df, "text", "df output"), (p_sum, "json", "storage summary")]:
-            result["artifacts"].append({
-                "path": str(p.relative_to(ctx.snapshot_root)),
-                "type": typ,
-                "size_bytes": p.stat().st_size,
-                "sha256": None,
-                "sensitive": False,
-                "redacted": False,
-                "description": desc,
-            })
+            result["artifacts"].append(self._register_artifact(
+                ctx,
+                path=p,
+                type_=typ,
+                sensitive=False,
+                redacted=False,
+                description=desc,
+                tags=["system", "storage"],
+            ))
 
         ctx.signals["system.usb_free_bytes"] = free
 

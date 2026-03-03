@@ -61,15 +61,15 @@ class NetworkBasicsCollector(BaseCollector):
             (p3, "text", "ip neigh", True),
             (p_norm, "json", "interfaces summary", False),
         ]:
-            result["artifacts"].append({
-                "path": str(pp.relative_to(ctx.snapshot_root)),
-                "type": typ,
-                "size_bytes": pp.stat().st_size,
-                "sha256": None,
-                "sensitive": sens,
-                "redacted": bool(ctx.redaction_enabled and sens and ctx.research_mode in {"light","medium"}),
-                "description": desc,
-            })
+            result["artifacts"].append(self._register_artifact(
+                ctx,
+                path=pp,
+                type_=typ,
+                sensitive=sens,
+                redacted=bool(ctx.redaction_enabled and sens and ctx.research_mode in {"light", "medium"}),
+                description=desc,
+                tags=["network"],
+            ))
 
         result["normalized_data"] = norm
         ctx.signals["network.interfaces_count"] = len(norm["interfaces"])

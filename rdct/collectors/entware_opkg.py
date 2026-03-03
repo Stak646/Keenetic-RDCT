@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .base import BaseCollector, CollectorContext, CollectorMeta
-from ..utils import redact_text, sha256_text, write_json
+from ..utils import redact_text, sha256_text, utc_now_iso, write_json
 
 
 class EntwareOpkgCollector(BaseCollector):
@@ -26,7 +26,7 @@ class EntwareOpkgCollector(BaseCollector):
         warnings: List[Dict[str, Any]] = []
 
         if not Path("/opt").exists():
-            warnings.append({"time": "", "level": "warning", "code": "opt_missing", "message": "/opt not found; Entware likely not installed."})
+            warnings.append({"time": utc_now_iso(), "level": "warning", "code": "opt_missing", "message": "/opt not found; Entware likely not installed."})
             self._finalize_result(ctx, result, started)
             self.write_result_json(ctx, result)
             self.write_errors_json(ctx, errors, warnings)
@@ -87,34 +87,34 @@ class EntwareOpkgCollector(BaseCollector):
         result["stats"]["files_written"] = 2 + len(collected_confs)
         result["stats"]["bytes_written"] = p_inst.stat().st_size + p_sum.stat().st_size + sum(p.stat().st_size for p in collected_confs)
 
-        result["artifacts"].append({
-            "path": str(p_inst.relative_to(ctx.snapshot_root)),
-            "type": "json",
-            "size_bytes": p_inst.stat().st_size,
-            "sha256": None,
-            "sensitive": False,
-            "redacted": False,
-            "description": "Installed opkg packages",
-        })
+        result["artifacts"].append(self._register_artifact(
+            ctx,
+            path=p_inst,
+            type_="json",
+            sensitive=False,
+            redacted=False,
+            description="Installed opkg packages",
+            tags=["entware", "opkg"],
+        ))
         for p in collected_confs:
-            result["artifacts"].append({
-                "path": str(p.relative_to(ctx.snapshot_root)),
-                "type": "text",
-                "size_bytes": p.stat().st_size,
-                "sha256": None,
-                "sensitive": True,
-                "redacted": bool(ctx.redaction_enabled and ctx.research_mode in {"light","medium"}),
-                "description": "opkg config/repository file (redacted in Light/Medium)",
-            })
-        result["artifacts"].append({
-            "path": str(p_sum.relative_to(ctx.snapshot_root)),
-            "type": "json",
-            "size_bytes": p_sum.stat().st_size,
-            "sha256": None,
-            "sensitive": False,
-            "redacted": False,
-            "description": "opkg status summary",
-        })
+            result["artifacts"].append(self._register_artifact(
+                ctx,
+                path=p,
+                type_="text",
+                sensitive=True,
+                redacted=bool(ctx.redaction_enabled and ctx.research_mode in {"light", "medium"}),
+                description="opkg config/repository file (redacted in Light/Medium)",
+                tags=["entware", "opkg"],
+            ))
+        result["artifacts"].append(self._register_artifact(
+            ctx,
+            path=p_sum,
+            type_="json",
+            sensitive=False,
+            redacted=False,
+            description="opkg status summary",
+            tags=["entware", "opkg"],
+        ))
 
         result["normalized_data"] = {"packages": sorted([f"{p['name']}={p.get('version','')}" for p in pkgs])}
         ctx.signals["entware.installed_packages"] = result["normalized_data"]["packages"]

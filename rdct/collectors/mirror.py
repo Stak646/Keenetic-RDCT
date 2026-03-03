@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .base import BaseCollector, CollectorContext, CollectorMeta
-from ..utils import redact_text, sha256_file, utc_now_iso, write_json
+from ..constants import MIRROR_INDEX_VERSION
+from ..utils import utc_now_iso, write_json
 
 
 VIRTUAL_ROOTS = ("/proc", "/sys", "/dev", "/run", "/tmp")
@@ -106,6 +107,9 @@ class MirrorCollector(BaseCollector):
         entries: List[Dict[str, Any]] = []
         per_dir_count: Dict[str, int] = {}
         seen_inodes: Set[Tuple[int, int]] = set()
+
+        def _mtime_iso(st_mtime: float) -> str:
+            return datetime.fromtimestamp(st_mtime, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
         def add_entry(**kw):
             entries.append(kw)
@@ -320,9 +324,15 @@ class MirrorCollector(BaseCollector):
                     sensitive = _looks_sensitive_path(src)
                     if ctx.research_mode in {"light", "medium"} and sensitive:
                         # Stub in Light/Medium
-                        stub = mirror_out / str(src).lstrip("/").replace("/", "__") + ".stub.txt"
+                        base_dst = mirror_out / str(src).lstrip("/")
+                        stub = base_dst.with_name(base_dst.name + ".stub.txt")
                         stub.parent.mkdir(parents=True, exist_ok=True)
-                        stub.write_text("REDACTED (sensitive file stub)\n", encoding="utf-8")
+                        stub.write_text(
+                            "REDACTED (sensitive file stub)\n"
+                            f"source_path={src}\n"
+                            f"size_bytes={size}\n",
+                            encoding="utf-8",
+                        )
                         totals["stubs_created"] += 1
                         totals["files_skipped"] += 1
                         add_entry(
@@ -332,7 +342,7 @@ class MirrorCollector(BaseCollector):
                             action="stubbed",
                             reason_code="sensitive_in_light",
                             size_bytes=size,
-                            mtime=utc_now_iso(),
+                            mtime=_mtime_iso(st.st_mtime),
                             sha256=None,
                             depth=ddepth + 1,
                             sensitive=True,
@@ -343,7 +353,8 @@ class MirrorCollector(BaseCollector):
 
                     # max_single
                     if size > max_single:
-                        meta = mirror_out / str(src).lstrip("/").replace("/", "__") + ".metadata.json"
+                        base_dst = mirror_out / str(src).lstrip("/")
+                        meta = base_dst.with_name(base_dst.name + ".metadata.json")
                         write_json(meta, {"source_path": str(src), "size_bytes": size, "note": "metadata only (too large)"})
                         totals["stubs_created"] += 1
                         totals["files_skipped"] += 1
@@ -354,7 +365,7 @@ class MirrorCollector(BaseCollector):
                             action="metadata_only",
                             reason_code="too_large_single",
                             size_bytes=size,
-                            mtime=utc_now_iso(),
+                            mtime=_mtime_iso(st.st_mtime),
                             sha256=None,
                             depth=ddepth + 1,
                             sensitive=False,
@@ -379,7 +390,7 @@ class MirrorCollector(BaseCollector):
                                 action="tailed",
                                 reason_code="max_total_bytes_tail",
                                 size_bytes=size,
-                                mtime=utc_now_iso(),
+                                mtime=_mtime_iso(st.st_mtime),
                                 sha256=None,
                                 depth=ddepth + 1,
                                 sensitive=False,
@@ -397,7 +408,7 @@ class MirrorCollector(BaseCollector):
                             action="skipped",
                             reason_code="max_total_bytes",
                             size_bytes=size,
-                            mtime=utc_now_iso(),
+                            mtime=_mtime_iso(st.st_mtime),
                             sha256=None,
                             depth=ddepth + 1,
                             sensitive=False,
@@ -420,7 +431,7 @@ class MirrorCollector(BaseCollector):
                             action="copied",
                             reason_code="ok",
                             size_bytes=size,
-                            mtime=utc_now_iso(),
+                            mtime=_mtime_iso(st.st_mtime),
                             sha256=None,
                             depth=ddepth + 1,
                             sensitive=False,
@@ -436,7 +447,7 @@ class MirrorCollector(BaseCollector):
                             action="skipped",
                             reason_code="permission_denied",
                             size_bytes=size,
-                            mtime=utc_now_iso(),
+                            mtime=_mtime_iso(st.st_mtime),
                             sha256=None,
                             depth=ddepth + 1,
                             sensitive=False,
@@ -452,7 +463,7 @@ class MirrorCollector(BaseCollector):
                             action="skipped",
                             reason_code="read_error",
                             size_bytes=size,
-                            mtime=utc_now_iso(),
+                            mtime=_mtime_iso(st.st_mtime),
                             sha256=None,
                             depth=ddepth + 1,
                             sensitive=False,
@@ -467,7 +478,7 @@ class MirrorCollector(BaseCollector):
                 break
 
         mirror_index = {
-            "mirror_index_version": "1.0.0",
+            "mirror_index_version": MIRROR_INDEX_VERSION,
             "generated_at": utc_now_iso(),
             "run_id": ctx.run_id,
             "mirror": {
@@ -500,26 +511,26 @@ class MirrorCollector(BaseCollector):
 
         result["run"]["status"] = "success" if totals["files_copied"] else "partial"
         result["stats"]["items_collected"] = totals["files_copied"]
-        result["stats"]["files_written"] = 2  # plus copied files (not counted here)
-        result["stats"]["bytes_written"] = idx_path.stat().st_size + stats_path.stat().st_size
-        result["artifacts"].append({
-            "path": str(idx_path.relative_to(ctx.snapshot_root)),
-            "type": "json",
-            "size_bytes": idx_path.stat().st_size,
-            "sha256": None,
-            "sensitive": True,
-            "redacted": bool(ctx.redaction_enabled and ctx.research_mode in {"light","medium"}),
-            "description": "Mirror index (what was copied/skipped and why)",
-        })
-        result["artifacts"].append({
-            "path": str(stats_path.relative_to(ctx.snapshot_root)),
-            "type": "json",
-            "size_bytes": stats_path.stat().st_size,
-            "sha256": None,
-            "sensitive": False,
-            "redacted": False,
-            "description": "Mirror totals and stop reason",
-        })
+        result["stats"]["files_written"] = 2 + int(totals["files_copied"]) + int(totals["stubs_created"])
+        result["stats"]["bytes_written"] = idx_path.stat().st_size + stats_path.stat().st_size + int(totals["bytes_copied"])
+        result["artifacts"].append(self._register_artifact(
+            ctx,
+            path=idx_path,
+            type_="json",
+            sensitive=True,
+            redacted=bool(ctx.redaction_enabled and ctx.research_mode in {"light", "medium"}),
+            description="Mirror index (what was copied/skipped and why)",
+            tags=["mirror"],
+        ))
+        result["artifacts"].append(self._register_artifact(
+            ctx,
+            path=stats_path,
+            type_="json",
+            sensitive=False,
+            redacted=False,
+            description="Mirror totals and stop reason",
+            tags=["mirror"],
+        ))
 
         result["normalized_data"] = {
             "mirror_files_copied": totals["files_copied"],

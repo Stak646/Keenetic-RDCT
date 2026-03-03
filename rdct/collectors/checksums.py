@@ -49,15 +49,15 @@ class ChecksumsCollector(BaseCollector):
         result["stats"]["items_collected"] = count
         result["stats"]["files_written"] = 1
         result["stats"]["bytes_written"] = size
-        result["artifacts"].append({
-            "path": str(out.relative_to(ctx.snapshot_root)),
-            "type": "sha256",
-            "size_bytes": size,
-            "sha256": None,
-            "sensitive": False,
-            "redacted": False,
-            "description": "Snapshot checksums (sha256)",
-        })
+        result["artifacts"].append(self._register_artifact(
+            ctx,
+            path=out,
+            type_="sha256",
+            sensitive=False,
+            redacted=False,
+            description="Snapshot checksums (sha256)",
+            tags=["checksums"],
+        ))
         result["normalized_data"] = {"covered_files_count": count}
 
         self._finalize_result(ctx, result, started)

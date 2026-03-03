@@ -88,11 +88,13 @@ def statvfs_bytes(path: Path) -> Tuple[int, int]:
 class StorageLayout:
     base_path: Path
     install_dir: Path
+    config_dir: Path
     deps_dir: Path
     cache_dir: Path
     run_dir: Path
     reports_dir: Path
     logs_dir: Path
+    apps_dir: Path
 
     filesystem_type: Optional[str] = None
     mount_flags: Optional[List[str]] = None
@@ -129,11 +131,13 @@ def build_layout(base_path: Path) -> StorageLayout:
     return StorageLayout(
         base_path=base_path,
         install_dir=base_path,
+        config_dir=base_path / "config",
         deps_dir=base_path / "deps",
         cache_dir=base_path / "cache",
         run_dir=base_path / "run",
         reports_dir=base_path / "reports",
         logs_dir=base_path / "logs",
+        apps_dir=base_path / "apps",
     )
 
 
@@ -154,7 +158,7 @@ def preflight_usb_only(layout: StorageLayout) -> StorageLayout:
         raise UsbOnlyError(f"USB-only enforced: base_path is not on an external USB mount: {layout.base_path}")
 
     # Make sure directories are on same external mount
-    for p in [layout.install_dir, layout.deps_dir, layout.cache_dir, layout.run_dir, layout.reports_dir, layout.logs_dir]:
+    for p in [layout.install_dir, layout.deps_dir, layout.cache_dir, layout.run_dir, layout.reports_dir, layout.logs_dir, layout.config_dir, layout.apps_dir]:
         mi = find_mount_for_path(p, usb_mounts)
         if not mi or mi.mountpoint != base_mi.mountpoint:
             raise UsbOnlyError(
@@ -163,7 +167,7 @@ def preflight_usb_only(layout: StorageLayout) -> StorageLayout:
             )
 
     # Ensure directories exist and writable.
-    for p in [layout.deps_dir, layout.cache_dir, layout.run_dir, layout.reports_dir, layout.logs_dir]:
+    for p in [layout.deps_dir, layout.cache_dir, layout.run_dir, layout.reports_dir, layout.logs_dir, layout.config_dir, layout.apps_dir]:
         p.mkdir(parents=True, exist_ok=True)
         testfile = p / ".rdct_rw_test"
         try:
@@ -183,7 +187,8 @@ def preflight_usb_only(layout: StorageLayout) -> StorageLayout:
 
 def usb_health_summary(layout: StorageLayout) -> str:
     free = int(layout.free_space_before_bytes or 0)
+    ro = "ro" in (layout.mount_flags or [])
     return (
         f"USB mount: {layout.usb_device} on {layout.usb_mountpoint} "
-        f"(fs={layout.filesystem_type}, free={human_bytes(free)})"
+        f"(fs={layout.filesystem_type}, free={human_bytes(free)}, ro={ro})"
     )

@@ -71,7 +71,8 @@ class PolicyEngine:
         rules = self.load_rules()
         decisions: List[PolicyDecision] = []
 
-        suggested_collectors: List[str] = []
+        auto_actions: List[str] = []
+        suggested_actions: List[str] = []
         config_overrides: Dict[str, Any] = {}
         blocks: List[str] = []
 
@@ -149,30 +150,33 @@ class PolicyEngine:
                 artifacts_refs=[],
             ))
 
-            # Apply actions to plan
+            # Apply actions to plan separated by decision
+            target = auto_actions if decision == "auto" else suggested_actions
             for a in actions:
-                if a.startswith("run_collector:"):
-                    suggested_collectors.append(a.split(":", 1)[1])
-                elif a.startswith("disable_collector:"):
-                    config_overrides.setdefault("collectors.disabled", []).append(a.split(":", 1)[1])
-                elif a.startswith("set:"):
-                    # set:key=value
-                    kv = a.split(":", 1)[1]
-                    if "=" in kv:
-                        k, v = kv.split("=", 1)
-                        config_overrides[k.strip()] = v.strip()
-                elif a.startswith("block:"):
-                    blocks.append(a.split(":", 1)[1])
-                elif a.startswith("suggest:"):
-                    # suggestions shown to user
-                    config_overrides.setdefault("suggestions", []).append(a.split(":", 1)[1])
+                target.append(a)
+
+            # Only auto actions are applied to config_overrides immediately.
+            if decision == "auto":
+                for a in actions:
+                    if a.startswith("disable_collector:"):
+                        config_overrides.setdefault("collectors.disabled", []).append(a.split(":", 1)[1])
+                    elif a.startswith("set:"):
+                        kv = a.split(":", 1)[1]
+                        if "=" in kv:
+                            k, v = kv.split("=", 1)
+                            config_overrides[k.strip()] = v.strip()
+                    elif a.startswith("block:"):
+                        blocks.append(a.split(":", 1)[1])
+                    elif a.startswith("suggest:"):
+                        config_overrides.setdefault("suggestions", []).append(a.split(":", 1)[1])
 
         plan = {
             "plan_version": "1.0.0",
             "generated_at": utc_now_iso(),
             "research_mode": research_mode,
             "decisions": [d.__dict__ for d in decisions],
-            "suggested_collectors": sorted(set(suggested_collectors)),
+            "auto_actions": auto_actions,
+            "suggested_actions": suggested_actions,
             "config_overrides": config_overrides,
             "blocks": sorted(set(blocks)),
         }

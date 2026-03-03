@@ -60,6 +60,11 @@ _REDACTION_PATTERNS: Tuple[Tuple[re.Pattern, str], ...] = (
     (re.compile(r"(?i)(Set-Cookie:\s*)(.+)"), r"\1REDACTED"),
 )
 
+# Network identifiers often leak internal topology.
+_IPV4_RE = re.compile(r"\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b")
+_MAC_RE = re.compile(r"\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b")
+_IPV6_RE = re.compile(r"\b(?:[0-9A-Fa-f]{1,4}:){2,7}[0-9A-Fa-f]{1,4}\b")
+
 
 def redact_text(text: str, level: str = "strict") -> str:
     """
@@ -72,6 +77,28 @@ def redact_text(text: str, level: str = "strict") -> str:
     out = text
     for pat, repl in _REDACTION_PATTERNS:
         out = pat.sub(repl, out)
+
+    # Network IDs
+    def _repl_ipv4(m: re.Match) -> str:
+        ip = m.group(0)
+        if level == "normal":
+            parts = ip.split(".")
+            return ".".join(parts[:3] + ["x"]) if len(parts) == 4 else "IP_REDACTED"
+        return "IP_REDACTED"
+
+    def _repl_mac(m: re.Match) -> str:
+        mac = m.group(0)
+        if level == "normal":
+            parts = re.split(r"[:-]", mac)
+            if len(parts) == 6:
+                return ":".join(parts[:3] + ["xx", "xx", "xx"])
+        return "MAC_REDACTED"
+
+    out = _MAC_RE.sub(_repl_mac, out)
+    out = _IPV4_RE.sub(_repl_ipv4, out)
+    # IPv6 is typically fully redacted because partial redaction is error-prone.
+    if level in {"strict", "normal"}:
+        out = _IPV6_RE.sub("IPV6_REDACTED", out)
     if level == "strict":
         # remove potential private keys blocks
         out = re.sub(r"-----BEGIN [A-Z ]+PRIVATE KEY-----.*?-----END [A-Z ]+PRIVATE KEY-----",

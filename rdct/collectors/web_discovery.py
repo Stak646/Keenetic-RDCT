@@ -57,13 +57,13 @@ class WebDiscoveryCollector(BaseCollector):
         local_scan_allowed = bool(net_policy.get("local_scan_allowed", True))
         web_probe_allowed = bool(net_policy.get("web_probe_allowed", False))
 
-        # Gate: In Light, probes disabled by default.
-        if ctx.research_mode == "light" and not web_probe_allowed:
+        # Gate: Respect web_probe_allowed for all modes.
+        if not web_probe_allowed:
             result["run"]["status"] = "skipped"
             result["findings"].append({
                 "severity": "info",
                 "code": "web_probe_disabled",
-                "title": "Web probes disabled in Light mode",
+                "title": "Web probes disabled",
                 "details": "Enable modes.network_policy.web_probe_allowed to allow local HTTP probing.",
                 "refs": [],
             })
@@ -95,7 +95,9 @@ class WebDiscoveryCollector(BaseCollector):
 
         endpoints: List[Dict[str, Any]] = []
         headers_dir = ctx.snapshot_root / "web" / "http_headers"
+        bodies_dir = ctx.snapshot_root / "web" / "http_bodies"
         headers_dir.mkdir(parents=True, exist_ok=True)
+        bodies_dir.mkdir(parents=True, exist_ok=True)
 
         for port in port_nums[:40]:
             if ctx.should_stop():
@@ -133,6 +135,13 @@ class WebDiscoveryCollector(BaseCollector):
             hpath = headers_dir / f"{port}.json"
             write_json(hpath, {"url": endpoint["url"], "headers": headers, "status": probe.get("status"), "reason": probe.get("reason")})
             endpoint["headers_ref"] = str(hpath.relative_to(ctx.snapshot_root))
+
+            # Save HTML/body sample (redacted in Light/Medium)
+            if ctx.redaction_enabled and ctx.research_mode in {"light", "medium"}:
+                body = redact_text(body, ctx.redaction_level)
+            body_path = bodies_dir / f"{port}.html"
+            body_path.write_text(body, encoding="utf-8", errors="ignore")
+            endpoint["body_ref"] = str(body_path.relative_to(ctx.snapshot_root))
             endpoints.append(endpoint)
 
             # findings: admin panels (heuristic)
@@ -150,18 +159,41 @@ class WebDiscoveryCollector(BaseCollector):
 
         result["run"]["status"] = "success"
         result["stats"]["items_collected"] = len(endpoints)
-        result["stats"]["files_written"] = 1 + len(endpoints)
-        result["stats"]["bytes_written"] = inv_path.stat().st_size + sum((ctx.snapshot_root / e["headers_ref"]).stat().st_size for e in endpoints)
+        result["stats"]["files_written"] = 1 + (2 * len(endpoints))
+        result["stats"]["bytes_written"] = inv_path.stat().st_size + sum((ctx.snapshot_root / e["headers_ref"]).stat().st_size for e in endpoints) + sum((ctx.snapshot_root / e["body_ref"]).stat().st_size for e in endpoints)
 
-        result["artifacts"].append({
-            "path": str(inv_path.relative_to(ctx.snapshot_root)),
-            "type": "json",
-            "size_bytes": inv_path.stat().st_size,
-            "sha256": None,
-            "sensitive": True,
-            "redacted": bool(ctx.redaction_enabled and ctx.research_mode in {"light","medium"}),
-            "description": "Discovered local HTTP endpoints inventory",
-        })
+        # Inventory + per-endpoint headers/body samples
+        result["artifacts"].append(self._register_artifact(
+            ctx,
+            path=inv_path,
+            type_="json",
+            sensitive=True,
+            redacted=bool(ctx.redaction_enabled and ctx.research_mode in {"light", "medium"}),
+            description="Discovered local HTTP endpoints inventory",
+            tags=["web", "discovery"],
+        ))
+
+        for e in endpoints:
+            hp = ctx.snapshot_root / e["headers_ref"]
+            bp = ctx.snapshot_root / e["body_ref"]
+            result["artifacts"].append(self._register_artifact(
+                ctx,
+                path=hp,
+                type_="json",
+                sensitive=True,
+                redacted=bool(ctx.redaction_enabled and ctx.research_mode in {"light", "medium"}),
+                description=f"HTTP headers sample for port {e['port']}",
+                tags=["web", "headers"],
+            ))
+            result["artifacts"].append(self._register_artifact(
+                ctx,
+                path=bp,
+                type_="text",
+                sensitive=True,
+                redacted=bool(ctx.redaction_enabled and ctx.research_mode in {"light", "medium"}),
+                description=f"HTTP body sample for port {e['port']} (truncated)",
+                tags=["web", "body"],
+            ))
 
         result["normalized_data"] = {"http_endpoints": sorted([e["url"] for e in endpoints])}
         ctx.signals["web.endpoints"] = result["normalized_data"]["http_endpoints"]

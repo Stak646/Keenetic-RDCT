@@ -56,22 +56,34 @@ def default_config(base_path: Path) -> Dict[str, Any]:
                 "local_scan_allowed": True,
                 "web_probe_allowed": False,
             },
+            "sandbox_policy": {
+                "enabled": False,
+                "max_time_sec": 30,
+            },
         },
         "limits": {
             "collector_timeout_sec": 30,
             "max_concurrency": 2,
             "max_snapshot_bytes_soft": 500 * 1024 * 1024,
+            "max_artifact_preview_bytes": 256 * 1024,
+            "pass_time_budget_ms": {
+                "pass1": 60_000,
+                "pass2": 120_000,
+                "pass3": 180_000,
+            },
         },
         "server": {
             "enabled": False,
             "bind": "0.0.0.0",
             "port": 0,  # 0 = auto
             "token": gen_token(),
+            "safe_view_default": True,
         },
         "dependencies": {
             "auto_install_enabled": True,
             "cleanup_after_run_enabled": False,
             "offline_mode_forced": False,
+            "registry_path": "deps/registry.json",
         },
         "collectors": {
             "enable_defaults": True,
@@ -80,6 +92,13 @@ def default_config(base_path: Path) -> Dict[str, Any]:
         },
         "apps": {
             "allowlist_enabled": True,
+            "require_confirmation_for_risky": True,
+        },
+        "allowlist": {
+            "apps": [],
+        },
+        "exports": {
+            "default_redaction_level": "strict",
         },
     }
 

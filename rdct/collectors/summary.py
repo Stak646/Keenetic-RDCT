@@ -54,15 +54,15 @@ class SummaryCollector(BaseCollector):
         result["stats"]["files_written"] = 2
         result["stats"]["bytes_written"] = p_top.stat().st_size + p_rec.stat().st_size
         for p, desc in [(p_top, "Top findings"), (p_rec, "Recommendations (fact-based)")]:
-            result["artifacts"].append({
-                "path": str(p.relative_to(ctx.snapshot_root)),
-                "type": "json",
-                "size_bytes": p.stat().st_size,
-                "sha256": None,
-                "sensitive": True,
-                "redacted": True,
-                "description": desc,
-            })
+            result["artifacts"].append(self._register_artifact(
+                ctx,
+                path=p,
+                type_="json",
+                sensitive=True,
+                redacted=bool(ctx.redaction_enabled),
+                description=desc,
+                tags=["reports", "summary"],
+            ))
 
         self._finalize_result(ctx, result, started)
         self.write_result_json(ctx, result)

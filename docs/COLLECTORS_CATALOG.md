@@ -24,4 +24,23 @@ Disabled by default:
 
 - mvp-15-mirror (heavy)
 
+Extended (opt-in; disabled by default):
+
+- ext-01-firewall (root)
+- ext-02-conntrack (root)
+- ext-03-dns
+- ext-04-dhcp
+- ext-05-wifi
+- ext-06-vpn
+- ext-07-file-security (root)
+- ext-08-recent-changes
+- ext-09-large-files
+- ext-10-app-inventory
+- ext-11-app-debug-bundles
+- ext-12-allowlist-apps
+- ext-13-timeline
+- ext-14-performance-profile
+- ext-15-sandbox-tests
+- ext-16-js-api-extractor
+
 Each collector writes artifacts under its category folder and a result JSON under `logs/collectors/<id>/`.

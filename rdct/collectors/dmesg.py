@@ -55,15 +55,15 @@ class DmesgCollector(BaseCollector):
         result["stats"]["files_written"] = 2
         result["stats"]["bytes_written"] = p.stat().st_size + p_err.stat().st_size
         for pp, typ, desc in [(p, "text", "dmesg snapshot"), (p_err, "json", "dmesg errors extract")]:
-            result["artifacts"].append({
-                "path": str(pp.relative_to(ctx.snapshot_root)),
-                "type": typ,
-                "size_bytes": pp.stat().st_size,
-                "sha256": None,
-                "sensitive": False,
-                "redacted": False,
-                "description": desc,
-            })
+            result["artifacts"].append(self._register_artifact(
+                ctx,
+                path=pp,
+                type_=typ,
+                sensitive=False,
+                redacted=False,
+                description=desc,
+                tags=["system", "dmesg"],
+            ))
 
         if fs_err:
             result["findings"].append({

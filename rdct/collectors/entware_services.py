@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .base import BaseCollector, CollectorContext, CollectorMeta
-from ..utils import write_json
+from ..utils import utc_now_iso, write_json
 
 
 class EntwareServicesCollector(BaseCollector):
@@ -26,7 +26,7 @@ class EntwareServicesCollector(BaseCollector):
 
         initd = Path("/opt/etc/init.d")
         if not initd.exists():
-            warnings.append({"time": "", "level": "warning", "code": "initd_missing", "message": "/opt/etc/init.d not found."})
+            warnings.append({"time": utc_now_iso(), "level": "warning", "code": "initd_missing", "message": "/opt/etc/init.d not found."})
             self._finalize_result(ctx, result, started)
             self.write_result_json(ctx, result)
             self.write_errors_json(ctx, errors, warnings)
@@ -63,15 +63,15 @@ class EntwareServicesCollector(BaseCollector):
         result["stats"]["bytes_written"] = p_inv.stat().st_size + p_status.stat().st_size
 
         for p, desc in [(p_inv, "init.d inventory"), (p_status, "init.d status outputs (truncated)")]:
-            result["artifacts"].append({
-                "path": str(p.relative_to(ctx.snapshot_root)),
-                "type": "json",
-                "size_bytes": p.stat().st_size,
-                "sha256": None,
-                "sensitive": False,
-                "redacted": False,
-                "description": desc,
-            })
+            result["artifacts"].append(self._register_artifact(
+                ctx,
+                path=p,
+                type_="json",
+                sensitive=False,
+                redacted=False,
+                description=desc,
+                tags=["entware", "services"],
+            ))
 
         result["normalized_data"] = {"services": sorted([s["name"] for s in inventory])}
         ctx.signals["entware.services"] = result["normalized_data"]["services"]

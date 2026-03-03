@@ -69,15 +69,15 @@ class ProcSnapshotCollector(BaseCollector):
         result["stats"]["bytes_written"] = p_ps.stat().st_size + p_top.stat().st_size + tree_path.stat().st_size
 
         for p, typ, desc in [(p_ps, "text", "ps snapshot"), (p_top, "text", "top snapshot"), (tree_path, "json", "process signatures")]:
-            result["artifacts"].append({
-                "path": str(p.relative_to(ctx.snapshot_root)),
-                "type": typ,
-                "size_bytes": p.stat().st_size,
-                "sha256": None,
-                "sensitive": True if typ == "text" else False,
-                "redacted": bool(ctx.redaction_enabled and ctx.research_mode in {"light","medium"}),
-                "description": desc,
-            })
+            result["artifacts"].append(self._register_artifact(
+                ctx,
+                path=p,
+                type_=typ,
+                sensitive=(typ == "text"),
+                redacted=bool(ctx.redaction_enabled and ctx.research_mode in {"light", "medium"}),
+                description=desc,
+                tags=["system", "processes"],
+            ))
 
         result["normalized_data"] = {"process_signatures": [p["signature"] for p in signatures]}
 

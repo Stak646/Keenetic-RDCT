@@ -110,15 +110,15 @@ class SensitiveScannerCollector(BaseCollector):
         result["stats"]["bytes_written"] = out_find.stat().st_size + out_plan.stat().st_size
 
         for p, desc in [(out_find, "Sensitive findings report"), (out_plan, "Redaction plan (export)")]:
-            result["artifacts"].append({
-                "path": str(p.relative_to(ctx.snapshot_root)),
-                "type": "json",
-                "size_bytes": p.stat().st_size,
-                "sha256": None,
-                "sensitive": True,
-                "redacted": True,
-                "description": desc,
-            })
+            result["artifacts"].append(self._register_artifact(
+                ctx,
+                path=p,
+                type_="json",
+                sensitive=True,
+                redacted=bool(ctx.redaction_enabled),
+                description=desc,
+                tags=["security", "redaction"],
+            ))
 
         high = sum(1 for i in findings if i["risk"] == "high")
         if high:

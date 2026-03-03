@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from ..utils import CommandResult, redact_text, sha256_file, utc_now_iso, write_json
+from ..constants import ERRORS_VERSION, RESULT_VERSION
 
 
 @dataclasses.dataclass
@@ -59,10 +60,40 @@ class BaseCollector:
 
     def out_dir(self, ctx: CollectorContext) -> Path:
         # A collector writes artifacts into its category directory by default.
-        return ctx.snapshot_root / self.META.category / self.META.collector_id
+        # NOTE: category folders are part of the public snapshot structure.
+        return ctx.snapshot_root / self.META.category
 
     def logs_dir(self, ctx: CollectorContext) -> Path:
         return ctx.snapshot_root / "logs" / "collectors" / self.META.collector_id
+
+    def _artifact_id(self, rel_path: str) -> str:
+        # Stable within a snapshot.
+        return f"{self.META.collector_id}:{rel_path}"
+
+    def _register_artifact(
+        self,
+        ctx: CollectorContext,
+        *,
+        path: Path,
+        type_: str,
+        sensitive: bool,
+        redacted: bool,
+        description: str = "",
+        tags: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        rel = str(path.relative_to(ctx.snapshot_root))
+        sha = sha256_file(path)
+        return {
+            "artifact_id": self._artifact_id(rel),
+            "path": rel,
+            "type": type_,
+            "size_bytes": int(path.stat().st_size),
+            "sha256": sha,
+            "sensitive": bool(sensitive),
+            "redacted": bool(redacted),
+            "description": description or None,
+            "tags": tags or [],
+        }
 
     def run(self, ctx: CollectorContext) -> Dict[str, Any]:
         """
@@ -158,7 +189,7 @@ class BaseCollector:
 
     def _result_template(self, ctx: CollectorContext, status: str) -> Dict[str, Any]:
         return {
-            "result_version": "1.0.0",
+            "result_version": RESULT_VERSION,
             "collector": {
                 "name": self.META.name,
                 "version": self.META.version,
@@ -177,6 +208,7 @@ class BaseCollector:
                 "requires_root": bool(self.META.requires_root),
                 "effective_root": bool(os.geteuid() == 0) if hasattr(os, "geteuid") else False,
                 "redaction_enabled": bool(ctx.redaction_enabled),
+                "redaction_level": str(ctx.redaction_level),
             },
             "stats": {
                 "items_collected": 0,
@@ -203,7 +235,7 @@ class BaseCollector:
             return None
         p = self.logs_dir(ctx) / "errors.json"
         payload = {
-            "errors_version": "1.0.0",
+            "errors_version": ERRORS_VERSION,
             "collector_id": self.META.collector_id,
             "run_id": ctx.run_id,
             "generated_at": utc_now_iso(),

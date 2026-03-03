@@ -111,19 +111,20 @@ class EnvironmentDetectorCollector(BaseCollector):
         result["stats"]["files_written"] = 3
         result["stats"]["bytes_written"] = p1.stat().st_size + p2.stat().st_size + p3.stat().st_size
         for p, desc in [(p1, "KeeneticOS info"), (p2, "Entware info"), (p3, "Tools inventory")]:
-            result["artifacts"].append({
-                "path": str(p.relative_to(ctx.snapshot_root)),
-                "type": "json",
-                "size_bytes": p.stat().st_size,
-                "sha256": None,
-                "sensitive": False,
-                "redacted": False,
-                "description": desc,
-            })
+            result["artifacts"].append(self._register_artifact(
+                ctx,
+                path=p,
+                type_="json",
+                sensitive=False,
+                redacted=False,
+                description=desc,
+                tags=["environment"],
+            ))
 
         result["normalized_data"] = {
             "entware_present": bool(entware_present),
             "tools_available": sorted([t["name"] for t in tools if t["available"]]),
+            "keeneticos_version": keeneticos.get("version"),
         }
 
         # Signals

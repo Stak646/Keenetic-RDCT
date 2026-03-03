@@ -38,15 +38,15 @@ class RoutesRulesCollector(BaseCollector):
         result["stats"]["bytes_written"] = p1.stat().st_size + p2.stat().st_size
 
         for pp, typ, desc in [(p1, "text", "ip route"), (p2, "text", "ip rule")]:
-            result["artifacts"].append({
-                "path": str(pp.relative_to(ctx.snapshot_root)),
-                "type": typ,
-                "size_bytes": pp.stat().st_size,
-                "sha256": None,
-                "sensitive": False,
-                "redacted": False,
-                "description": desc,
-            })
+            result["artifacts"].append(self._register_artifact(
+                ctx,
+                path=pp,
+                type_=typ,
+                sensitive=False,
+                redacted=False,
+                description=desc,
+                tags=["network", "routes"],
+            ))
 
         result["normalized_data"] = {
             "routes_sha256": sha256_text(routes),

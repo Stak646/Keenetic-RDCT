@@ -91,15 +91,15 @@ class SocketsPortsCollector(BaseCollector):
         result["stats"]["items_collected"] = len(entries)
         result["stats"]["files_written"] = 1
         result["stats"]["bytes_written"] = out.stat().st_size
-        result["artifacts"].append({
-            "path": str(out.relative_to(ctx.snapshot_root)),
-            "type": "json",
-            "size_bytes": out.stat().st_size,
-            "sha256": None,
-            "sensitive": True,  # can include process names / args (raw)
-            "redacted": bool(ctx.redaction_enabled and ctx.research_mode in {"light","medium"}),
-            "description": "Listening ports inventory (port→pid best-effort)",
-        })
+        result["artifacts"].append(self._register_artifact(
+            ctx,
+            path=out,
+            type_="json",
+            sensitive=True,
+            redacted=bool(ctx.redaction_enabled and ctx.research_mode in {"light", "medium"}),
+            description="Listening ports inventory (port→pid best-effort)",
+            tags=["network", "ports"],
+        ))
 
         result["normalized_data"] = {
             "listening_ports": sorted({f"{e['proto']}:{e['local']}:{e['port']}" for e in entries}),

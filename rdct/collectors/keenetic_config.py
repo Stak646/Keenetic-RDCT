@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from .base import BaseCollector, CollectorContext, CollectorMeta
-from ..utils import redact_text, sha256_text, write_json
+from ..utils import redact_text, sha256_text, utc_now_iso, write_json
 
 
 class KeeneticConfigCollector(BaseCollector):
@@ -72,19 +72,19 @@ class KeeneticConfigCollector(BaseCollector):
                 (out_cfg, "text", "Keenetic config export", True),
                 (out_meta, "json", "Config export metadata", False),
             ]:
-                result["artifacts"].append({
-                    "path": str(p.relative_to(ctx.snapshot_root)),
-                    "type": typ,
-                    "size_bytes": p.stat().st_size,
-                    "sha256": None,
-                    "sensitive": sens,
-                    "redacted": redacted if sens else False,
-                    "description": desc,
-                })
+                result["artifacts"].append(self._register_artifact(
+                    ctx,
+                    path=p,
+                    type_=typ,
+                    sensitive=sens,
+                    redacted=bool(redacted if sens else False),
+                    description=desc,
+                    tags=["keenetic", "config"],
+                ))
             result["normalized_data"] = {"config_sha256": meta["sha256_redacted"]}
         else:
             warnings.append({
-                "time": "",
+                "time": utc_now_iso(),
                 "level": "warning",
                 "code": "keenetic_config_unavailable",
                 "message": "Unable to export Keenetic config (ndmc unavailable or permission denied).",
