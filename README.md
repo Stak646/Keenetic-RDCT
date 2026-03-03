@@ -7,7 +7,7 @@ For details see `docs/`.
 
 ## Quick start (CLI)
 
-### One-command install from GitHub (recommended)
+### One-command install from GitHub (recommended, auto-starts WebUI)
 
 Run **one command** on the router (downloads RDCT onto the USB drive and creates `rdct.sh` wrapper in the base folder):
 
@@ -25,13 +25,12 @@ curl -fsSL https://raw.githubusercontent.com/<OWNER>/<REPO>/main/install.sh | \
   RDCT_GH_OWNER=<OWNER> RDCT_GH_REPO=<REPO> RDCT_BASE=/tmp/mnt/sda1/rdct sh
 ```
 
-After install:
+After install the WebUI/API is started automatically.
 
-```sh
-/tmp/mnt/sda1/rdct/rdct.sh preflight
-/tmp/mnt/sda1/rdct/rdct.sh run --mode light
-/tmp/mnt/sda1/rdct/rdct.sh serve --bind 0.0.0.0 --port 8080
-```
+Controls:
+
+- Disable auto-run: `RDCT_NO_RUN=1`
+- Run WebUI in foreground (blocking): `RDCT_DAEMON=0`
 
 ### Run directly (developer / local)
 
@@ -48,7 +47,12 @@ python3 -m rdct --base /tmp/mnt/sda1/rdct reports
 python3 -m rdct --base /tmp/mnt/sda1/rdct serve --bind 0.0.0.0 --port 8080
 ```
 
-Open `http://<router-ip>:8080/` and paste `server.token` from `config/rdct.json`.
+Open `http://<router-ip>:<port>/` and paste `server.token` from `config/rdct.json`.
+
+## Languages
+
+- Documentation is available in English and Russian (`docs/*.md` + `docs/*.ru.md`).
+- CLI supports `--lang en|ru` (also auto-detected from `LANG` / `RDCT_LANG`).
 
 ## Storage layout (USB)
 

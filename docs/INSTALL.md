@@ -2,7 +2,7 @@
 
 RDCT is designed for **KeeneticOS + Entware** and stores **all** data on an external USB drive (USB-only).
 
-## One-command install from GitHub
+## One-command install from GitHub (auto-start WebUI)
 
 Run on the router:
 
@@ -27,6 +27,18 @@ What it does:
 - Downloads the repository (or a release asset, if available) into `<base>/install`
 - Creates `<base>/rdct.sh` wrapper (so you can run RDCT without `cd`)
 - Initializes `config/rdct.json`
+
+After installation the script **starts WebUI/API automatically**.
+
+Defaults:
+
+- WebUI runs **in background** (so the one-liner returns)
+- Logs are written to: `<base>/logs/rdct-serve.log`
+
+Controls:
+
+- Disable auto-run: `RDCT_NO_RUN=1`
+- Run WebUI in foreground (blocking): `RDCT_DAEMON=0`
 
 ## Manual install (git clone)
 

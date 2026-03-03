@@ -383,4 +383,33 @@ else
   log "NOTE: port=0 (auto). Start server to see chosen port in logs." 
 fi
 
-exit 0
+# ---- auto-start WebUI (one-command requirement) ----
+# Disable with RDCT_NO_RUN=1
+RDCT_NO_RUN="${RDCT_NO_RUN:-0}"
+RDCT_DAEMON="${RDCT_DAEMON:-1}"  # 1 = background by default
+
+if [ "$RDCT_NO_RUN" = "1" ]; then
+  log "RDCT_NO_RUN=1: not starting WebUI. You can start manually with: $BASE/rdct.sh serve --bind 0.0.0.0 --port $PORT"
+  exit 0
+fi
+
+SERVE_LOG="$LOGS_DIR/rdct-serve.log"
+PIDFILE="$RUN_DIR/webui.pid"
+
+log "Starting WebUI..."
+
+if [ "$RDCT_DAEMON" = "1" ]; then
+  # background
+  if have nohup; then
+    nohup "$BASE/rdct.sh" serve --bind 0.0.0.0 --port "$PORT" >>"$SERVE_LOG" 2>&1 &
+  else
+    "$BASE/rdct.sh" serve --bind 0.0.0.0 --port "$PORT" >>"$SERVE_LOG" 2>&1 &
+  fi
+  echo $! > "$PIDFILE" 2>/dev/null || true
+  log "WebUI started in background (pid=$(cat "$PIDFILE" 2>/dev/null || echo "?"))."
+  log "Logs: $SERVE_LOG"
+  exit 0
+fi
+
+# foreground
+exec "$BASE/rdct.sh" serve --bind 0.0.0.0 --port "$PORT"

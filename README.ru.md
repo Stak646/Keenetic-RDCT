@@ -29,7 +29,7 @@
 
 ## Быстрый старт (CLI)
 
-### Установка с GitHub одной командой (рекомендуется)
+### Установка с GitHub одной командой (рекомендуется, автозапуск WebUI)
 
 Запусти **одну команду** на роутере (скрипт скачает RDCT на USB и создаст `rdct.sh` в базовой папке):
 
@@ -47,13 +47,12 @@ curl -fsSL https://raw.githubusercontent.com/<OWNER>/<REPO>/main/install.sh | \
   RDCT_GH_OWNER=<OWNER> RDCT_GH_REPO=<REPO> RDCT_BASE=/tmp/mnt/sda1/rdct sh
 ```
 
-После установки:
+После установки WebUI/API **запускается автоматически**.
 
-```sh
-/tmp/mnt/sda1/rdct/rdct.sh preflight
-/tmp/mnt/sda1/rdct/rdct.sh run --mode light
-/tmp/mnt/sda1/rdct/rdct.sh serve --bind 0.0.0.0 --port 8080
-```
+Управление:
+
+- Отключить автозапуск: `RDCT_NO_RUN=1`
+- Запустить WebUI в foreground (команда не завершается): `RDCT_DAEMON=0`
 
 ### Запуск напрямую (для разработки / локально)
 
@@ -74,7 +73,7 @@ python3 -m rdct --base /tmp/mnt/sda1/rdct reports
 python3 -m rdct --base /tmp/mnt/sda1/rdct serve --bind 0.0.0.0 --port 8080
 ```
 
-2) Откройте `http://<router-ip>:8080/`  
+2) Откройте `http://<router-ip>:<port>/`  
 3) Возьмите токен из `config/rdct.json` (`server.token`) и вставьте в WebUI.
 
 ## Выходные форматы
@@ -85,6 +84,11 @@ python3 -m rdct --base /tmp/mnt/sda1/rdct serve --bind 0.0.0.0 --port 8080
 - `checksums.sha256` — контрольные суммы файлов снапшота
 
 Подробнее: `docs/FORMAT_SPEC.md`
+
+## Языки
+
+- Документация доступна на **EN/RU** (`docs/*.md` и `docs/*.ru.md`).
+- CLI поддерживает `--lang en|ru` (также автоопределение по `LANG` / `RDCT_LANG`).
 
 ## Что можно расширить дальше
 

@@ -2,7 +2,7 @@
 
 RDCT рассчитан на **KeeneticOS + Entware** и хранит **все** данные только на внешнем USB-накопителе (USB-only).
 
-## Установка с GitHub одной командой
+## Установка с GitHub одной командой (автозапуск WebUI)
 
 Запусти на роутере:
 
@@ -27,6 +27,18 @@ curl -fsSL https://raw.githubusercontent.com/<OWNER>/<REPO>/main/install.sh | \
 - Скачивает репозиторий (или release-asset, если есть) в `<base>/install`
 - Создаёт обёртку `<base>/rdct.sh` (для запуска без `cd`)
 - Инициализирует `config/rdct.json`
+
+После установки скрипт **автоматически запускает WebUI/API**.
+
+По умолчанию:
+
+- WebUI стартует **в фоне** (команда завершается)
+- Логи: `<base>/logs/rdct-serve.log`
+
+Управление:
+
+- Отключить автозапуск: `RDCT_NO_RUN=1`
+- Запустить WebUI в foreground (команда не завершается): `RDCT_DAEMON=0`
 
 ## Ручная установка (git clone)
 
