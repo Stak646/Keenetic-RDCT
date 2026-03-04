@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keenetic-debug/schemas/common_defs.schema.json",
+  "title": "Common Definitions",
+  "description": "Общие определения, переиспользуемые в других схемах.",
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp"
+    },
+    "report_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+-[0-9]{8}T[0-9]{6}Z-[a-f0-9]{4}$",
+      "minLength": 20,
+      "maxLength": 50,
+      "description": "Format: <device_prefix>-<YYYYMMDDTHHmmSSZ>-<hex4>"
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+$"
+    },
+    "status": {
+      "enum": ["OK", "SKIP", "SOFT_FAIL", "HARD_FAIL", "TIMEOUT"],
+      "description": "Universal status for collectors, checks, operations"
+    },
+    "severity": {
+      "enum": ["INFO", "WARN", "CRIT"],
+      "description": "Severity level for checks and alerts"
+    },
+    "log_level": {
+      "enum": ["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"]
+    },
+    "research_mode": {
+      "enum": ["light", "medium", "full", "extreme"]
+    },
+    "performance_mode": {
+      "enum": ["lite", "middle", "hard", "auto"]
+    },
+    "privacy_tag": {
+      "enum": ["password", "token", "ip", "mac", "ssid", "cookie", "key", "cert", "logs", "payload"]
+    },
+    "privacy_tags": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/privacy_tag"},
+      "uniqueItems": true
+    },
+    "estimated_cost": {
+      "type": "object",
+      "properties": {
+        "cpu_pct": {"type": "number", "minimum": 0, "maximum": 100},
+        "ram_mb": {"type": "number", "minimum": 0},
+        "io_mb": {"type": "number", "minimum": 0},
+        "net_kb": {"type": "number", "minimum": 0},
+        "time_s": {"type": "number", "minimum": 0}
+      }
+    },
+    "safe_path": {
+      "type": "string",
+      "pattern": "^[^\\x00]*$",
+      "description": "Path string: no null bytes, no unprintable chars"
+    },
+    "arch": {
+      "enum": ["mipsel", "mips", "aarch64"]
+    }
+  }
+}

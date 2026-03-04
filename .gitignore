@@ -1,0 +1,49 @@
+# Snapshot artifacts
+*.tar.gz
+*.zip
+reports/
+
+# Workdir / temp
+workdir/
+tmp/
+run/
+
+# Secrets
+auth.token
+*.key
+*.pem
+*.p12
+
+# Build artifacts
+dist/
+build/
+*.o
+*.bin
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Go
+/vendor/
+
+# Node
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test output
+tests/output/
+coverage/

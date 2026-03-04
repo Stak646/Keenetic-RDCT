@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keenetic-debug/schemas/excluded.schema.json",
+  "title": "Excluded Paths Report",
+  "description": "Отчёт о пропущенных путях при зеркалировании: путь, причина, правило.",
+  "type": "object",
+  "required": ["schema_id", "schema_version", "total_excluded", "entries"],
+  "properties": {
+    "schema_id": {"const": "excluded"},
+    "schema_version": {"type": "string", "pattern": "^[0-9]+$"},
+    "total_excluded": {"type": "integer", "minimum": 0},
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "reason", "rule_id"],
+        "properties": {
+          "path": {"type": "string"},
+          "reason": {
+            "enum": ["denylist", "self_mirror_denylist", "depth_limit", "file_limit", "size_limit", "file_too_large", "extension", "symlink", "cycle", "permission_denied"]
+          },
+          "rule_id": {"type": "string"},
+          "size_hint": {"type": ["integer", "null"]}
+        }
+      }
+    }
+  }
+}

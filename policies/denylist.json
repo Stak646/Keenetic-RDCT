@@ -1,0 +1,6 @@
+{
+  "_policy_version": 1,
+  "_description": "User denylist overrides. These paths are added to default denylist.",
+  "paths": [],
+  "globs": []
+}

@@ -1,0 +1,245 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keenetic-debug/schemas/config.schema.json",
+  "title": "keenetic-debug Configuration",
+  "description": "Полная конфигурация keenetic-debug с safe-by-default значениями.",
+  "type": "object",
+  "properties": {
+    "config_version": {"type": "integer", "minimum": 1, "default": 1},
+    "research_mode": {"enum": ["light", "medium", "full", "extreme"], "default": "medium"},
+    "performance_mode": {"enum": ["lite", "middle", "hard", "auto"], "default": "auto"},
+    "lang": {"enum": ["ru", "en"], "default": "en"},
+    "debug": {"type": "boolean", "default": false, "description": "Step 309: enable debug logging and Governor dumps"},
+    "readonly": {"type": "boolean", "default": true, "description": "Step 310: block dangerous collectors when true"},
+    "dangerous_ops": {"type": "boolean", "default": false},
+    "dry_run": {"type": "boolean", "default": false, "description": "Step 311: adapters plan but do not execute"},
+    "resume": {"type": "boolean", "default": true},
+    "snapshot_mode": {"enum": ["baseline", "delta"], "default": "baseline"},
+
+    "paths": {
+      "type": "object",
+      "description": "Step 307: explicit path configuration",
+      "properties": {
+        "base_dir": {"type": "string", "default": "/opt/keenetic-debug"},
+        "workdir": {"type": "string", "default": "auto"},
+        "output_dir": {"type": "string", "default": "auto"},
+        "run_dir": {"type": "string", "default": "auto"},
+        "logs_dir": {"type": "string", "default": "auto"}
+      }
+    },
+
+    "webui": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean", "default": true},
+        "bind": {"type": "string", "default": "127.0.0.1", "description": "NEVER 0.0.0.0 by default"},
+        "port": {"type": ["integer", "null"], "minimum": 1024, "maximum": 65535, "default": null},
+        "port_range_start": {"type": "integer", "default": 5000, "minimum": 1024},
+        "port_range_end": {"type": "integer", "default": 5099, "maximum": 65535},
+        "https": {"type": "boolean", "default": false},
+        "cert_path": {"type": ["string", "null"], "default": null},
+        "key_path": {"type": ["string", "null"], "default": null},
+        "session_timeout_s": {"type": "integer", "default": 3600, "minimum": 60, "description": "Step 331"},
+        "max_response_mb": {"type": "integer", "default": 100, "minimum": 1, "description": "Step 332"},
+        "max_download_mb": {"type": "integer", "default": 500, "minimum": 1, "description": "Step 332"},
+        "allowed_lan_cidrs": {"type": "array", "items": {"type": "string"}, "default": [], "description": "Step 333"},
+        "ui_expose_reports": {"type": "boolean", "default": true, "description": "Step 317"},
+        "rate_limits": {
+          "type": "object",
+          "description": "Step 318",
+          "properties": {
+            "rps": {"type": "integer", "default": 60, "minimum": 1},
+            "burst": {"type": "integer", "default": 10, "minimum": 1},
+            "heavy_rps": {"type": "integer", "default": 5, "minimum": 1},
+            "heavy_burst": {"type": "integer", "default": 2, "minimum": 1}
+          }
+        }
+      }
+    },
+
+    "governor": {
+      "type": "object",
+      "description": "Step 285",
+      "properties": {
+        "cpu_limit_pct": {"type": "integer", "default": 70, "minimum": 10, "maximum": 100},
+        "ram_limit_pct": {"type": "integer", "default": 80, "minimum": 10, "maximum": 100},
+        "min_disk_free_mb": {"type": "integer", "default": 50, "minimum": 5},
+        "max_workers": {"type": ["integer", "null"], "minimum": 1, "default": null, "description": "Step 327: null=auto"},
+        "min_workers": {"type": "integer", "default": 1, "minimum": 1, "description": "Step 327"},
+        "io_budget_mb_s": {"type": ["integer", "null"], "default": null},
+        "sampling_interval_s": {"type": "integer", "default": 2, "minimum": 1},
+        "nice": {"type": "integer", "default": 10, "minimum": 0, "maximum": 19},
+        "ionice_class": {"enum": ["idle", "best-effort", "none"], "default": "best-effort"},
+        "backoff_strategy": {"enum": ["linear", "exponential"], "default": "linear", "description": "Step 326"}
+      }
+    },
+
+    "collectors": {
+      "type": "object",
+      "description": "Step 279: per-collector overrides",
+      "properties": {
+        "parallel_group": {
+          "type": "object",
+          "description": "Step 325: groups that cannot run in parallel",
+          "additionalProperties": {"type": "array", "items": {"type": "string"}}
+        }
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": {"type": "boolean"},
+          "timeout_s": {"type": "integer", "minimum": 1, "maximum": 300},
+          "max_output_mb": {"type": "integer", "minimum": 1, "maximum": 200},
+          "estimated_cost": {"type": "object"}
+        }
+      }
+    },
+
+    "mirror": {
+      "type": "object",
+      "description": "Step 280: mirror policy",
+      "properties": {
+        "enabled": {"type": "boolean", "default": false},
+        "roots": {"type": "array", "items": {"type": "string"}, "default": ["/opt/etc"]},
+        "max_depth": {"type": "integer", "default": 10, "minimum": 1, "maximum": 50},
+        "max_files": {"type": "integer", "default": 10000, "minimum": 100},
+        "max_total_mb": {"type": "integer", "default": 500, "minimum": 10},
+        "max_file_mb": {"type": "integer", "default": 10, "minimum": 1},
+        "follow_symlinks": {"type": "boolean", "default": false},
+        "denylist_file": {"type": "string", "default": "policies/denylist.json"},
+        "allowlist": {"type": "array", "items": {"type": "string"}, "default": []}
+      }
+    },
+
+    "privacy": {
+      "type": "object",
+      "description": "Step 281: privacy / redaction",
+      "properties": {
+        "policy_file": {"type": "string", "default": "policies/privacy.json"},
+        "custom_rules": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "regex": {"type": "string"}, "tag": {"type": "string"}}}, "default": [], "description": "Step 321"},
+        "preview_secrets": {"type": "boolean", "default": false, "description": "Step 322"},
+        "hash_ips": {"type": "boolean", "default": true, "description": "Step 323"},
+        "hash_macs": {"type": "boolean", "default": true, "description": "Step 323"},
+        "redact_paths": {"type": "array", "items": {"type": "string"}, "default": ["/opt/etc/openvpn/*", "/opt/etc/wireguard/*"], "description": "Step 324"},
+        "sanitize_export": {"type": "boolean", "default": true, "description": "Step 316"}
+      }
+    },
+
+    "checks": {
+      "type": "object",
+      "description": "Step 282",
+      "properties": {
+        "enabled": {"type": "boolean", "default": true},
+        "severity_levels": {"type": "array", "items": {"enum": ["INFO", "WARN", "CRIT"]}, "default": ["INFO", "WARN", "CRIT"]},
+        "ruleset": {"type": "string", "default": "default"},
+        "thresholds": {
+          "type": "object",
+          "description": "Step 336",
+          "properties": {
+            "new_open_ports": {"type": "integer", "default": 3},
+            "conntrack_growth": {"type": "number", "default": 50.0}
+          }
+        },
+        "privacy_aware": {"type": "boolean", "default": true},
+        "emit_diffs": {
+          "type": "object",
+          "description": "Step 337",
+          "properties": {
+            "inventory_delta": {"type": "boolean", "default": true},
+            "config_drift": {"type": "boolean", "default": true}
+          }
+        }
+      }
+    },
+
+    "incremental": {
+      "type": "object",
+      "description": "Step 283",
+      "properties": {
+        "base_policy": {"enum": ["last_baseline", "explicit", "auto"], "default": "last_baseline"},
+        "base_report_id": {"type": ["string", "null"], "default": null},
+        "chain_max_depth": {"type": "integer", "default": 10, "minimum": 1, "maximum": 100},
+        "rebase_policy": {"enum": ["count", "size_threshold", "manual"], "default": "count", "description": "Step 338"},
+        "rebase_n": {"type": "integer", "default": 10, "minimum": 1},
+        "rebase_size_mb": {"type": "integer", "default": 500, "minimum": 10, "description": "Step 338"},
+        "state_db_path": {"type": "string", "default": "auto"},
+        "diff_defaults": {"enum": ["text", "binary", "hybrid"], "default": "hybrid"},
+        "hash_important_configs": {"type": "boolean", "default": true},
+        "log_cursor_mode": {"enum": ["inode_offset", "timestamp", "hybrid"], "default": "hybrid"},
+        "tombstones_enabled": {"type": "boolean", "default": true},
+        "delta_packaging": {"enum": ["stream", "staged"], "default": "stream", "description": "Step 339"}
+      }
+    },
+
+    "adapters": {
+      "type": "object",
+      "description": "Step 286",
+      "properties": {
+        "ndm": {"type": "object", "properties": {"enabled": {"type": "boolean", "default": true}, "timeout_s": {"type": "integer", "default": 10}}},
+        "rcicli": {"type": "object", "properties": {"enabled": {"type": "boolean", "default": true}, "timeout_s": {"type": "integer", "default": 10}}},
+        "http_rci": {"type": "object", "properties": {"enabled": {"type": "boolean", "default": false}, "timeout_s": {"type": "integer", "default": 5}, "bind_iface": {"type": ["string", "null"], "default": null, "description": "Step 334"}, "allowed_ifaces": {"type": "array", "items": {"type": "string"}, "default": []}}},
+        "ssh": {"type": "object", "properties": {"enabled": {"type": "boolean", "default": false, "description": "Step 335: off by default"}}},
+        "dry_run": {"type": "boolean", "default": false, "description": "Step 311"},
+        "allow_active_checks": {"type": "boolean", "default": false},
+        "allowlist_endpoints": {"type": "array", "items": {"type": "string"}, "default": ["http://127.0.0.1:79/rci/"], "description": "Step 312"}
+      }
+    },
+
+    "storage": {
+      "type": "object",
+      "description": "Step 328-330",
+      "properties": {
+        "usb_mount_required": {"type": "boolean", "default": false, "description": "Step 328"},
+        "usb_preferred": {"type": "boolean", "default": true, "description": "Step 328"},
+        "min_free_mb": {"type": "integer", "default": 50, "minimum": 5, "description": "Step 329"},
+        "write_amplification_guard": {"type": "boolean", "default": true, "description": "Step 330"}
+      }
+    },
+
+    "retention": {
+      "type": "object",
+      "description": "Step 288",
+      "properties": {
+        "max_snapshots": {"type": "integer", "default": 20, "minimum": 1},
+        "max_days": {"type": "integer", "default": 90, "minimum": 1},
+        "policy": {"enum": ["oldest_first", "largest_first", "manual"], "default": "oldest_first"}
+      }
+    },
+
+    "crypto": {
+      "type": "object",
+      "description": "Step 314",
+      "properties": {
+        "enabled": {"type": "boolean", "default": false},
+        "method": {"enum": ["passphrase", "public_key"], "default": "passphrase"},
+        "key_path": {"type": ["string", "null"], "default": null},
+        "encrypt_snapshots": {"type": "boolean", "default": false},
+        "sign_manifests": {"type": "boolean", "default": false}
+      }
+    },
+
+    "updates": {
+      "type": "object",
+      "description": "Step 315, 340",
+      "properties": {
+        "enabled": {"type": "boolean", "default": false},
+        "channel": {"enum": ["stable", "beta"], "default": "stable"},
+        "auto_check": {"type": "boolean", "default": false},
+        "offline_bundle_path": {"type": ["string", "null"], "default": null},
+        "pinned_release_manifest_url": {"type": ["string", "null"], "default": null, "description": "Step 340"}
+      }
+    },
+
+    "archive": {
+      "type": "object",
+      "properties": {
+        "format": {"enum": ["tar.gz", "zip"], "default": "tar.gz"},
+        "compression_level": {"type": "integer", "default": 6, "minimum": 1, "maximum": 9}
+      }
+    },
+
+    "max_log_kb": {"type": "integer", "default": 1024, "minimum": 64, "description": "Step 313"},
+    "usb_only": {"type": "boolean", "default": false, "description": "Step 287"},
+    "sandbox_mode": {"type": "boolean", "default": false}
+  }
+}

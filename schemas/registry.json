@@ -1,0 +1,22 @@
+{
+  "$comment": "Schema registry: schema_id → file path. All IDs must be unique.",
+  "schemas": [
+    {"schema_id": "plugin", "file": "plugin.schema.json"},
+    {"schema_id": "result", "file": "result.schema.json"},
+    {"schema_id": "manifest", "file": "manifest.schema.json"},
+    {"schema_id": "event_log_entry", "file": "event_log_entry.schema.json"},
+    {"schema_id": "audit_event", "file": "audit_event.schema.json"},
+    {"schema_id": "preflight", "file": "preflight.schema.json"},
+    {"schema_id": "plan", "file": "plan.schema.json"},
+    {"schema_id": "checks", "file": "checks.schema.json"},
+    {"schema_id": "redaction_report", "file": "redaction_report.schema.json"},
+    {"schema_id": "excluded", "file": "excluded.schema.json"},
+    {"schema_id": "inventory", "file": "inventory.schema.json"},
+    {"schema_id": "inventory_delta", "file": "inventory_delta.schema.json"},
+    {"schema_id": "config", "file": "config.schema.json"},
+    {"schema_id": "state", "file": "state.schema.json"},
+    {"schema_id": "sbom", "file": "sbom.schema.json"},
+    {"schema_id": "release_manifest", "file": "release_manifest.schema.json"},
+    {"schema_id": "bundle_info", "file": "bundle_info.schema.json"}
+  ]
+}

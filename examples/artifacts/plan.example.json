@@ -1,0 +1,62 @@
+{
+  "schema_id": "plan",
+  "schema_version": "1",
+  "report_id": "kn3010-20260304T143022Z-a7f3",
+  "timestamp": "2026-03-04T14:30:22Z",
+  "research_mode": "medium",
+  "performance_mode": "auto",
+  "snapshot_mode": "incremental",
+  "base_report_id": "kn3010-20260301T100000Z-b2c1",
+  "tasks": [
+    {
+      "order": 1,
+      "collector_id": "system.base",
+      "status": "INCLUDE",
+      "reason": "always_required",
+      "dependencies": [],
+      "timeout_s": 30,
+      "budget": {"cpu_pct": 5, "ram_mb": 4, "io_mb": 1}
+    },
+    {
+      "order": 2,
+      "collector_id": "network.base",
+      "status": "INCLUDE",
+      "reason": "always_required",
+      "dependencies": [],
+      "timeout_s": 30,
+      "budget": {"cpu_pct": 5, "ram_mb": 4, "io_mb": 1}
+    },
+    {
+      "order": 3,
+      "collector_id": "network.deep",
+      "status": "INCLUDE",
+      "reason": "state_changed",
+      "dependencies": ["network.base"],
+      "timeout_s": 20,
+      "budget": {"cpu_pct": 10, "ram_mb": 8, "io_mb": 2}
+    },
+    {
+      "order": 4,
+      "collector_id": "wifi.radio",
+      "status": "INCLUDE",
+      "reason": "state_changed",
+      "dependencies": ["system.base"],
+      "timeout_s": 15,
+      "budget": {"cpu_pct": 5, "ram_mb": 4, "io_mb": 1}
+    },
+    {
+      "order": 5,
+      "collector_id": "vpn.status",
+      "status": "SKIP",
+      "reason": "no_changes",
+      "dependencies": ["network.base"]
+    },
+    {
+      "order": 6,
+      "collector_id": "storage.health",
+      "status": "SKIP",
+      "reason": "mode_excluded",
+      "dependencies": []
+    }
+  ]
+}

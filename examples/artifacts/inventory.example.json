@@ -1,0 +1,56 @@
+{
+  "schema_id": "inventory",
+  "schema_version": "1",
+  "report_id": "kn3010-20260304T143022Z-a7f3",
+  "timestamp": "2026-03-04T14:30:50Z",
+  "device_fingerprint": "a1b2c3d4e5f6",
+  "entries": [
+    {
+      "port": 80,
+      "proto": "tcp",
+      "bind_addr": "0.0.0.0",
+      "pid": 512,
+      "process_name": "nginx",
+      "executable": "/opt/sbin/nginx",
+      "cmdline": "nginx: master process /opt/sbin/nginx",
+      "opkg_package": "nginx",
+      "package_version": "1.24.0-1",
+      "config_paths": ["/opt/etc/nginx/nginx.conf"],
+      "detected_endpoints": [
+        {
+          "url": "http://127.0.0.1:80/",
+          "status_code": 200,
+          "content_type": "text/html",
+          "etag": "\"65a1b2c3\"",
+          "last_modified": "2026-01-15T10:00:00Z",
+          "confidence": "confirmed"
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "port": 22,
+      "proto": "tcp",
+      "bind_addr": "0.0.0.0",
+      "pid": 300,
+      "process_name": "dropbear",
+      "executable": "/opt/sbin/dropbear",
+      "opkg_package": "dropbear",
+      "package_version": "2024.84-1",
+      "config_paths": ["/opt/etc/dropbear"],
+      "detected_endpoints": [],
+      "warnings": ["external_bind_0.0.0.0"]
+    }
+  ],
+  "rci": {
+    "local": true,
+    "http_rci": false,
+    "interfaces": ["br0"]
+  },
+  "statistics": {
+    "total_ports": 2,
+    "total_processes": 2,
+    "total_packages": 2,
+    "total_endpoints": 1
+  }
+}

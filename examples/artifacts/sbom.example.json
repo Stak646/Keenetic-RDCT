@@ -1,0 +1,17 @@
+{
+  "schema_id": "sbom",
+  "schema_version": "1",
+  "tool_version": "0.1.0-alpha",
+  "generated_at": "2026-03-04T14:31:05Z",
+  "components": [
+    {"name": "core", "version": "0.1.0", "type": "core", "file": "modules/core.sh", "sha256": "abc123", "status": "active"},
+    {"name": "system.base", "version": "1.0.0", "type": "collector", "file": "collectors/system.base/run.sh", "sha256": "def456", "status": "active"},
+    {"name": "network.base", "version": "1.0.0", "type": "collector", "file": "collectors/network.base/run.sh", "sha256": "789abc", "status": "active"},
+    {"name": "wifi.radio", "version": "1.0.0", "type": "collector", "file": "collectors/wifi.radio/run.sh", "sha256": null, "status": "skipped"}
+  ],
+  "collectors_run": [
+    {"id": "system.base", "version": "1.0.0", "status": "OK", "reason": null},
+    {"id": "network.base", "version": "1.0.0", "status": "OK", "reason": null},
+    {"id": "wifi.radio", "version": "1.0.0", "status": "SKIP", "reason": "no_wifi_detected"}
+  ]
+}

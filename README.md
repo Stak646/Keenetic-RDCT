@@ -1,63 +1,45 @@
-# RDCT — Router Diagnostic & Control Tool (USB-only)
+# keenetic-debug
 
-This repository contains an **MVP implementation** of RDCT per the provided specification:
-KeeneticOS + Entware diagnostic snapshot tool with **USB-only** storage, **CLI + WebUI/API**, **manifest**, **incremental baseline/delta**, and a **Policy Engine**.
+![CI](https://github.com/keenetic-debug/keenetic-debug/actions/workflows/ci.yml/badge.svg)
+![License](https://img.shields.io/badge/license-MIT-blue)
+![Version](https://img.shields.io/badge/version-0.1.0--alpha-orange)
 
-For details see `docs/`.
+Diagnostic tool for Keenetic routers with Entware.
 
-## Quick start (CLI)
+## Quick Start
 
-### One-command install from GitHub (recommended, auto-starts WebUI)
-
-Run **one command** on the router (downloads RDCT onto the USB drive and creates `rdct.sh` wrapper in the base folder):
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/<OWNER>/<REPO>/main/install.sh | \
-  RDCT_GH_OWNER=<OWNER> RDCT_GH_REPO=<REPO> sh
+```shell
+curl -fsSL https://github.com/Stak646/Keenetic-RDCT/install.sh | sh
+keenetic-debug start --mode light --perf lite
 ```
 
-Optional:
+## Features
+- 21 data collectors (system, network, wifi, vpn, storage, apps, mirror)
+- WebUI with auth, roles, rate limiting
+- CLI with full RU/EN localization
+- Incremental snapshots (baseline/delta chain)
+- 10+ automated checks (port drift, config drift, WiFi/VPN regression, etc.)
+- Privacy modes: Light (mask secrets) → Extreme (preserve all)
+- Safe-by-default: localhost bind, bearer token, readonly mode
 
-- choose USB base path explicitly:
+## Documentation
+- [Quick Start EN](docs/en/quickstart.md) | [RU](docs/ru/quickstart.md)
+- [Installation EN](docs/en/installation.md) | [RU](docs/ru/installation.md)
+- [WebUI Guide EN](docs/en/webui_guide.md) | [RU](docs/ru/webui_guide.md)
+- [CLI Reference EN](docs/en/cli_reference.md) | [RU](docs/ru/cli_reference.md)
+- [Security & Privacy EN](docs/en/security_privacy.md) | [RU](docs/ru/security_privacy.md)
+- [Configuration EN](docs/en/configuration.md) | [RU](docs/ru/configuration.md)
+- [Plugin Guide EN](docs/en/plugin_guide.md) | [RU](docs/ru/plugin_guide.md)
+- [Troubleshooting EN](docs/en/troubleshooting.md) | [RU](docs/ru/troubleshooting.md)
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/<OWNER>/<REPO>/main/install.sh | \
-  RDCT_GH_OWNER=<OWNER> RDCT_GH_REPO=<REPO> RDCT_BASE=/tmp/mnt/sda1/rdct sh
-```
+## Supported Architectures
+- mipsel (most Keenetic routers)
+- mips
+- aarch64 (newer models)
 
-After install the WebUI/API is started automatically.
-
-Controls:
-
-- Disable auto-run: `RDCT_NO_RUN=1`
-- Run WebUI in foreground (blocking): `RDCT_DAEMON=0`
-
-### Run directly (developer / local)
-
-```sh
-python3 -m rdct --base /tmp/mnt/sda1/rdct init
-python3 -m rdct --base /tmp/mnt/sda1/rdct preflight
-python3 -m rdct --base /tmp/mnt/sda1/rdct run --mode light
-python3 -m rdct --base /tmp/mnt/sda1/rdct reports
-```
-
-## WebUI/API
-
-```sh
-python3 -m rdct --base /tmp/mnt/sda1/rdct serve --bind 0.0.0.0 --port 8080
-```
-
-Open `http://<router-ip>:<port>/` and paste `server.token` from `config/rdct.json`.
-
-## Languages
-
-- Documentation is available in English and Russian (`docs/*.md` + `docs/*.ru.md`).
-- CLI supports `--lang en|ru` (also auto-detected from `LANG` / `RDCT_LANG`).
-
-## Storage layout (USB)
-
-- `cache/` – incremental index and normalized run data
-- `run/` – staging area for the current run
-- `reports/<run_id>/snapshot/` – finalized snapshot
-- `reports/<run_id>/<run_id>.tar.gz` – archive
-- `logs/tool/rdct.log` – tool log
+## Security by Default
+- WebUI binds to 127.0.0.1 only
+- Bearer token authentication
+- dangerous_ops=false by default
+- Rate limiting on all API endpoints
+- Automatic redaction in Light/Medium modes

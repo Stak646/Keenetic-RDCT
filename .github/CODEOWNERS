@@ -1,0 +1,8 @@
+# Critical areas require explicit review
+/schemas/                @core-team
+/policies/               @core-team
+/scripts/install.sh      @core-team @security-lead
+/web/                    @core-team @security-lead
+/modules/                @core-team
+/docs/dev/SECURITY_MODEL.md @security-lead
+SECURITY.md              @security-lead

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keenetic-debug/schemas/inventory_delta.schema.json",
+  "title": "Inventory Delta",
+  "description": "Дельта изменений inventory: новые/закрытые порты, изменения PID, пакеты, сервисы, endpoints.",
+  "type": "object",
+  "required": ["schema_id", "schema_version", "report_id", "base_report_id", "timestamp", "changes"],
+  "properties": {
+    "schema_id": {"const": "inventory_delta"},
+    "schema_version": {"type": "string", "pattern": "^[0-9]+$"},
+    "report_id": {"type": "string"},
+    "base_report_id": {"type": "string"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "changes": {
+      "type": "object",
+      "properties": {
+        "new_ports": {"type": "array", "items": {"type": "object", "properties": {"port": {"type": "integer"}, "proto": {"type": "string"}, "process": {"type": "string"}}}},
+        "closed_ports": {"type": "array", "items": {"type": "object", "properties": {"port": {"type": "integer"}, "proto": {"type": "string"}, "was_process": {"type": "string"}}}},
+        "pid_changes": {"type": "array", "items": {"type": "object", "properties": {"port": {"type": "integer"}, "old_pid": {"type": "integer"}, "new_pid": {"type": "integer"}}}},
+        "new_services": {"type": "array", "items": {"type": "string"}},
+        "stopped_services": {"type": "array", "items": {"type": "string"}},
+        "pkg_changes": {"type": "array", "items": {"type": "object", "properties": {"package": {"type": "string"}, "action": {"enum": ["installed", "removed", "upgraded"]}, "version": {"type": "string"}}}},
+        "new_endpoints": {"type": "array", "items": {"type": "object", "properties": {"url": {"type": "string"}, "port": {"type": "integer"}}}}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "properties": {
+        "total_changes": {"type": "integer"},
+        "new_ports_count": {"type": "integer"},
+        "closed_ports_count": {"type": "integer"}
+      }
+    }
+  }
+}

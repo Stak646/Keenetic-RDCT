@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "description": "Default privacy rules for redaction engine",
+  "modes": {
+    "light": {
+      "password": "zeroize",
+      "token": "zeroize",
+      "ip": "preserve",
+      "mac": "preserve",
+      "ssid": "preserve",
+      "cookie": "zeroize",
+      "key": "zeroize",
+      "cert": "redact_content"
+    },
+    "medium": {
+      "password": "zeroize",
+      "token": "partial_mask",
+      "ip": "hash_octets",
+      "mac": "hash_octets",
+      "ssid": "hash",
+      "cookie": "zeroize",
+      "key": "zeroize",
+      "cert": "redact_content"
+    },
+    "full": {
+      "password": "preserve_and_flag",
+      "token": "preserve_and_flag",
+      "ip": "preserve",
+      "mac": "preserve",
+      "ssid": "preserve",
+      "cookie": "preserve_and_flag",
+      "key": "preserve_and_flag",
+      "cert": "preserve"
+    },
+    "extreme": {
+      "password": "preserve_and_flag",
+      "token": "preserve_and_flag",
+      "ip": "preserve",
+      "mac": "preserve",
+      "ssid": "preserve",
+      "cookie": "preserve",
+      "key": "preserve",
+      "cert": "preserve"
+    }
+  },
+  "builtin_patterns": [
+    {"name": "password_field", "regex": "(password|passwd|pass|secret)\\s*[=:]\\s*.+", "tag": "password"},
+    {"name": "bearer_token", "regex": "Bearer\\s+[A-Za-z0-9+/=._-]{20,}", "tag": "token"},
+    {"name": "api_key", "regex": "(api[_-]?key|apikey)\\s*[=:]\\s*[A-Za-z0-9]{16,}", "tag": "key"},
+    {"name": "private_key_block", "regex": "-----BEGIN (RSA |EC )?PRIVATE KEY-----", "tag": "key"},
+    {"name": "ipv4_address", "regex": "\\b(?:(?:25[0-5]|2[0-4]\\d|[01]?\\d\\d?)\\.){3}(?:25[0-5]|2[0-4]\\d|[01]?\\d\\d?)\\b", "tag": "ip"},
+    {"name": "mac_address", "regex": "\\b([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\\b", "tag": "mac"},
+    {"name": "ssid_field", "regex": "(ssid|SSID)\\s*[=:]\\s*.+", "tag": "ssid"},
+    {"name": "cookie_header", "regex": "Cookie:\\s*.+", "tag": "cookie"},
+    {"name": "set_cookie", "regex": "Set-Cookie:\\s*.+", "tag": "cookie"}
+  ],
+  "custom_patterns": [],
+  "redact_paths": [
+    "/opt/etc/openvpn/*",
+    "/opt/etc/wireguard/*",
+    "/opt/etc/shadowsocks/*"
+  ]
+}

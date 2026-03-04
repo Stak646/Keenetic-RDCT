@@ -1,0 +1,5 @@
+{
+  "_policy_version": 1,
+  "_description": "User privacy rule overrides. These rules are added to default rules.",
+  "custom_rules": []
+}

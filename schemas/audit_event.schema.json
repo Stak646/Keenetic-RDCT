@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keenetic-debug/schemas/audit_event.schema.json",
+  "title": "Audit Event",
+  "description": "Запись аудит-лога: управленческие действия (start/stop/delete/restore/config change).",
+  "type": "object",
+  "required": ["ts", "action", "role", "result"],
+  "properties": {
+    "ts": {"type": "string", "format": "date-time"},
+    "action": {"enum": ["start", "stop", "cancel", "delete_report", "download_report", "config_change", "app_restart", "app_restore", "chain_rebase", "chain_compact", "sanitize", "login", "login_fail"]},
+    "role": {"enum": ["admin", "readonly", "system"]},
+    "source": {"enum": ["cli", "webui", "api", "system"]},
+    "ip": {"type": ["string", "null"]},
+    "result": {"enum": ["ok", "denied", "error"]},
+    "details": {"type": "object"},
+    "report_id": {"type": ["string", "null"]},
+    "error_message": {"type": ["string", "null"]}
+  }
+}

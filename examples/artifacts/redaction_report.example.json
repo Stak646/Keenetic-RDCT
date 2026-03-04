@@ -1,0 +1,32 @@
+{
+  "schema_id": "redaction_report",
+  "schema_version": "1",
+  "research_mode": "medium",
+  "total_findings": 5,
+  "findings": [
+    {
+      "file": "collectors/config.entware/artifacts/nginx.conf",
+      "line": 42,
+      "tag": "password",
+      "action": "zeroize",
+      "context": "server_password = ***REDACTED***"
+    },
+    {
+      "file": "collectors/network.base/artifacts/resolv.conf",
+      "line": 1,
+      "tag": "ip",
+      "action": "partial_mask",
+      "context": "nameserver 192.168.XXX.XXX"
+    }
+  ],
+  "summary": {
+    "password": 2,
+    "token": 1,
+    "ip": 2,
+    "mac": 0,
+    "ssid": 0,
+    "cookie": 0,
+    "key": 0,
+    "cert": 0
+  }
+}

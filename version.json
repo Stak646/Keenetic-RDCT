@@ -1,0 +1,8 @@
+{
+  "product": "keenetic-debug",
+  "version": "0.1.0-alpha",
+  "schema_compat_min": 1,
+  "schema_compat_max": 1,
+  "build": null,
+  "commit": null
+}

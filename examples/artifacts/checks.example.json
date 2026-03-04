@@ -1,0 +1,37 @@
+{
+  "schema_id": "checks",
+  "schema_version": "1",
+  "report_id": "kn3010-20260304T143022Z-a7f3",
+  "base_report_id": "kn3010-20260301T100000Z-b2c1",
+  "timestamp": "2026-03-04T14:30:55Z",
+  "summary": {"total": 3, "critical": 0, "warn": 2, "info": 1},
+  "checks": [
+    {
+      "id": "net.new_listen_port",
+      "severity": "WARN",
+      "title": "New listening port detected",
+      "description": "Port 8080/tcp appeared since baseline.",
+      "evidence": {"port": 8080, "proto": "tcp", "pid": 1234, "process": "nginx"},
+      "remediation_hint": "Verify application config and firewall rules.",
+      "privacy_tags": ["ip"],
+      "category": "network_exposure"
+    },
+    {
+      "id": "config.drift.entware",
+      "severity": "WARN",
+      "title": "Entware config changed",
+      "evidence": {"file": "/opt/etc/nginx/nginx.conf", "change": "modified", "mtime_delta_s": 86400},
+      "remediation_hint": "Review config changes.",
+      "privacy_tags": [],
+      "category": "config_drift"
+    },
+    {
+      "id": "pkg.new_package",
+      "severity": "INFO",
+      "title": "New package installed",
+      "evidence": {"package": "htop", "version": "3.2.2-1"},
+      "privacy_tags": [],
+      "category": "package_drift"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keenetic-debug/schemas/plan.schema.json",
+  "title": "Execution Plan",
+  "description": "Упорядоченный список задач (collectors) с зависимостями, бюджетами и причинами.",
+  "type": "object",
+  "required": ["schema_id", "schema_version", "report_id", "timestamp", "research_mode", "performance_mode", "snapshot_mode", "tasks"],
+  "properties": {
+    "schema_id": {"const": "plan"},
+    "schema_version": {"type": "string", "pattern": "^[0-9]+$"},
+    "report_id": {"type": "string", "minLength": 10},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "research_mode": {"enum": ["light", "medium", "full", "extreme"]},
+    "performance_mode": {"enum": ["lite", "middle", "hard", "auto"]},
+    "snapshot_mode": {"enum": ["baseline", "incremental"]},
+    "base_report_id": {"type": ["string", "null"]},
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["order", "collector_id", "status", "reason"],
+        "properties": {
+          "order": {"type": "integer", "minimum": 0},
+          "collector_id": {"type": "string"},
+          "status": {"enum": ["INCLUDE", "SKIP"]},
+          "reason": {
+            "type": "string",
+            "description": "always_required | state_changed | no_changes | no_root | dangerous_disabled | dependency_missing | mode_excluded | governor_budget"
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "timeout_s": {"type": "integer", "minimum": 1},
+          "budget": {
+            "type": "object",
+            "properties": {
+              "cpu_pct": {"type": "number"},
+              "ram_mb": {"type": "number"},
+              "io_mb": {"type": "number"}
+            }
+          }
+        }
+      }
+    }
+  }
+}

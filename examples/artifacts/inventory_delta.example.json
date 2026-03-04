@@ -1,0 +1,17 @@
+{
+  "schema_id": "inventory_delta",
+  "schema_version": "1",
+  "report_id": "kn3010-20260304T143022Z-a7f3",
+  "base_report_id": "kn3010-20260301T100000Z-b2c1",
+  "timestamp": "2026-03-04T14:30:50Z",
+  "changes": {
+    "new_ports": [{"port": 8080, "proto": "tcp", "process": "nginx"}],
+    "closed_ports": [],
+    "pid_changes": [{"port": 80, "old_pid": 500, "new_pid": 512}],
+    "new_services": [],
+    "stopped_services": [],
+    "pkg_changes": [{"package": "htop", "action": "installed", "version": "3.2.2-1"}],
+    "new_endpoints": [{"url": "http://127.0.0.1:8080/", "port": 8080}]
+  },
+  "summary": {"total_changes": 3, "new_ports_count": 1, "closed_ports_count": 0}
+}

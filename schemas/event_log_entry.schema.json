@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keenetic-debug/schemas/event_log_entry.schema.json",
+  "title": "Event Log Entry",
+  "description": "Формат записи event log (JSONL)",
+  "type": "object",
+  "required": ["ts", "level", "module", "event_id", "message_key"],
+  "properties": {
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp"
+    },
+    "level": {
+      "type": "string",
+      "enum": ["DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"]
+    },
+    "module": {
+      "type": "string",
+      "description": "Module identifier (e.g. core, governor, collector.network.base)"
+    },
+    "event_id": {
+      "type": "string",
+      "description": "Stable event identifier for correlation"
+    },
+    "message_key": {
+      "type": "string",
+      "description": "i18n message key (e.g. collector.started, governor.throttle)"
+    },
+    "params": {
+      "type": "object",
+      "description": "Key-value params for message interpolation",
+      "additionalProperties": true
+    },
+    "correlation_id": {
+      "type": "string",
+      "description": "Links related events (e.g. report_id or task_id)"
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Duration of the event in milliseconds (if applicable)"
+    }
+  },
+  "additionalProperties": false
+}

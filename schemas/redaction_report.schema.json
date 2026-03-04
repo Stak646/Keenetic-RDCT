@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keenetic-debug/schemas/redaction_report.schema.json",
+  "title": "Redaction Report",
+  "description": "Отчёт о чувствительных данных: что найдено, где, какое действие применено.",
+  "type": "object",
+  "required": ["schema_id", "schema_version", "research_mode", "total_findings", "findings", "summary"],
+  "properties": {
+    "schema_id": {"const": "redaction_report"},
+    "schema_version": {"type": "string", "pattern": "^[0-9]+$"},
+    "research_mode": {"enum": ["light", "medium", "full", "extreme"]},
+    "total_findings": {"type": "integer", "minimum": 0},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["file", "tag", "action"],
+        "properties": {
+          "file": {"type": "string"},
+          "line": {"type": ["integer", "null"]},
+          "tag": {"enum": ["password", "token", "ip", "mac", "ssid", "cookie", "key", "cert", "logs", "payload"]},
+          "action": {"enum": ["zeroize", "partial_mask", "hash", "preserve"]},
+          "context": {"type": "string", "description": "Фрагмент с уже применённой маской"}
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    }
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keenetic-debug/schemas/plugin.schema.json",
+  "title": "Collector Plugin Metadata",
+  "description": "Метаданные коллектора (plugin.json) — ТЗ п.4.8.1",
+  "type": "object",
+  "required": [
+    "id", "name", "version", "contract_version", "category",
+    "supported_research_modes", "supported_perf_modes",
+    "requires_root", "dangerous", "dependencies",
+    "estimated_cost", "timeout_s", "max_output_mb", "privacy_tags"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.]+$",
+      "description": "Stable collector identifier (e.g. network.deep)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable name"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "SemVer version"
+    },
+    "contract_version": {
+      "type": "string",
+      "pattern": "^\\d+$",
+      "description": "Contract version for compatibility"
+    },
+    "category": {
+      "type": "string",
+      "description": "Category identifier"
+    },
+    "supported_research_modes": {
+      "type": "array",
+      "items": { "enum": ["light", "medium", "full", "extreme"] },
+      "minItems": 1
+    },
+    "supported_perf_modes": {
+      "type": "array",
+      "items": { "enum": ["lite", "middle", "hard", "auto"] },
+      "minItems": 1
+    },
+    "requires_root": { "type": "boolean" },
+    "dangerous": { "type": "boolean" },
+    "dependencies": {
+      "type": "object",
+      "properties": {
+        "commands": { "type": "array", "items": { "type": "string" } },
+        "files": { "type": "array", "items": { "type": "string" } },
+        "endpoints": { "type": "array", "items": { "type": "string" } },
+        "optional_fallbacks": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "required": ["commands", "files", "endpoints"]
+    },
+    "estimated_cost": {
+      "type": "object",
+      "properties": {
+        "cpu_pct": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "ram_mb": { "type": "integer", "minimum": 0 },
+        "io_mb": { "type": "integer", "minimum": 0 },
+        "net_kb": { "type": "integer", "minimum": 0 },
+        "time_s": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["cpu_pct", "ram_mb", "io_mb", "net_kb", "time_s"]
+    },
+    "timeout_s": { "type": "integer", "minimum": 1 },
+    "max_output_mb": { "type": "integer", "minimum": 1 },
+    "privacy_tags": {
+      "type": "array",
+      "items": {
+        "enum": ["ip", "mac", "ssid", "token", "password", "cookie", "key", "cert", "logs", "payload"]
+      }
+    },
+    "incremental": {
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "strategy": { "enum": ["none", "mtime_size", "content_hash", "hybrid"] },
+        "cursors": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "additionalProperties": false
+}

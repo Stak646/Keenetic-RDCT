@@ -1,0 +1,25 @@
+{
+  "schema_id": "plugin",
+  "schema_version": "1",
+  "id": "system.system_info",
+  "name": "System Info",
+  "version": "1.0.0",
+  "contract_version": 1,
+  "category": "system",
+  "description_en": "System info: cpuinfo, meminfo, mounts, df, temperature",
+  "description_ru": "Системные сведения: cpuinfo, meminfo, mounts, df, температура",
+  "supported_research_modes": ["light", "medium", "full", "extreme"],
+  "supported_perf_modes": ["lite", "middle", "hard", "auto"],
+  "requires_root": false,
+  "dangerous": false,
+  "dependencies": {
+    "commands": ["cat","uname","df"],
+    "files": ["/proc/cpuinfo","/proc/meminfo"],
+    "optional_fallbacks": {}
+  },
+  "estimated_cost": {"time_s": 3, "cpu_pct": 5, "ram_mb": 2, "io_mb": 1},
+  "timeout_s": 30,
+  "max_output_mb": 5,
+  "privacy_tags": ["logs"],
+  "incremental": {"key": "system.system_info", "strategy": "mtime_size"}
+}

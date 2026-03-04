@@ -1,0 +1,144 @@
+{
+  "config_version": 1,
+  "research_mode": "medium",
+  "performance_mode": "auto",
+  "lang": "en",
+  "debug": false,
+  "readonly": true,
+  "dangerous_ops": false,
+  "resume": true,
+  "dry_run": false,
+  "snapshot_mode": "baseline",
+  "usb_only": false,
+  "sandbox_mode": false,
+  "paths": {
+    "base_dir": "/opt/keenetic-debug",
+    "workdir": "auto",
+    "output_dir": "auto",
+    "run_dir": "run",
+    "logs_dir": "var/logs",
+    "state_db_path": "auto"
+  },
+  "webui": {
+    "enabled": true,
+    "bind": "127.0.0.1",
+    "bind_iface": null,
+    "port": null,
+    "port_range_start": 5000,
+    "port_range_end": 5099,
+    "https": false,
+    "session_timeout_s": 3600,
+    "max_response_mb": 100,
+    "max_download_mb": 500,
+    "allowed_lan_cidrs": ["127.0.0.0/8", "192.168.0.0/16", "10.0.0.0/8", "172.16.0.0/12"],
+    "ui_expose_reports": true,
+    "rate_limits": {
+      "rps": 60,
+      "burst": 10,
+      "heavy_rps": 5,
+      "heavy_burst": 2
+    }
+  },
+  "governor": {
+    "cpu_limit_pct": 70,
+    "ram_limit_pct": 80,
+    "min_disk_free_mb": 50,
+    "min_workers": 1,
+    "max_workers": null,
+    "sampling_interval_s": 2,
+    "backoff_strategy": "linear"
+  },
+  "collectors": {},
+  "mirror": {
+    "enabled": false,
+    "roots": ["/opt"],
+    "max_depth": 10,
+    "max_files": 10000,
+    "max_total_mb": 500,
+    "max_file_mb": 50,
+    "follow_symlinks": false,
+    "denylist_file": "policies/denylist.json",
+    "allowlist": [],
+    "denylist_extra": []
+  },
+  "privacy": {
+    "policy_file": "policies/privacy.json",
+    "preview_secrets": false,
+    "hash_ips": true,
+    "hash_macs": true,
+    "redact_paths": [],
+    "custom_rules": [],
+    "sanitize_export": false
+  },
+  "checks": {
+    "enabled": true,
+    "severity_levels": ["info", "warn", "critical"],
+    "ruleset": "default",
+    "privacy_aware": true,
+    "thresholds": {
+      "new_open_ports": 1,
+      "cpu_spike_pct": 30,
+      "ram_spike_pct": 30,
+      "disk_growth_mb": 100,
+      "conntrack_growth": 1000
+    },
+    "emit_diffs": {
+      "inventory_delta": true,
+      "config_drift": true,
+      "route_firewall_diff": true,
+      "log_anomaly_summary": true
+    }
+  },
+  "incremental": {
+    "base_policy": "last_baseline",
+    "base_report_id": null,
+    "chain_max_depth": 10,
+    "rebase_policy": "every_n_deltas",
+    "rebase_n": 10,
+    "rebase_size_mb": 100,
+    "diff_defaults": "hybrid",
+    "hash_important_configs": true,
+    "log_cursor_mode": "inode_offset",
+    "tombstones_enabled": true,
+    "delta_packaging": "stream"
+  },
+  "adapters": {
+    "ndm": {"enabled": true, "timeout_s": 10},
+    "rcicli": {"enabled": true, "timeout_s": 10},
+    "http_rci": {"enabled": false, "timeout_s": 10, "bind_iface": null, "allowed_ifaces": ["br0"]},
+    "ssh": {"enabled": false},
+    "dry_run": false,
+    "allow_active_checks": false,
+    "allowlist_endpoints": ["/", "/api", "/status", "/health"]
+  },
+  "storage": {
+    "usb_mount_required": false,
+    "usb_preferred": true,
+    "min_free_mb": 50,
+    "write_amplification_guard": true,
+    "max_log_kb": 1024
+  },
+  "retention": {
+    "max_snapshots": 20,
+    "max_days": 90,
+    "max_total_mb": 1000,
+    "auto_cleanup": false
+  },
+  "archive": {
+    "format": "tar.gz",
+    "compression_level": 6
+  },
+  "crypto": {
+    "enabled": false,
+    "method": null,
+    "encrypt_snapshots": false,
+    "sign_manifests": false
+  },
+  "updates": {
+    "enabled": false,
+    "channel": "stable",
+    "auto_check": false,
+    "offline_bundle_path": null,
+    "pinned_release_manifest_url": null
+  }
+}

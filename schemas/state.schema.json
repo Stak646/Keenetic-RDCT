@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keenetic-debug/schemas/state.schema.json",
+  "title": "StateDB JSON Fallback",
+  "description": "JSON fallback формат StateDB при отсутствии SQLite.",
+  "type": "object",
+  "required": ["schema_id", "schema_version", "device_fingerprint"],
+  "properties": {
+    "schema_id": {"const": "state"},
+    "schema_version": {"type": "string", "pattern": "^[0-9]+$"},
+    "device_fingerprint": {"type": "string"},
+    "last_updated": {"type": "string", "format": "date-time"},
+    "file_index": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "size": {"type": "integer"},
+          "mtime": {"type": "integer"},
+          "mode": {"type": "string"},
+          "content_hash": {"type": ["string", "null"]},
+          "last_seen": {"type": "string"}
+        }
+      }
+    },
+    "command_fingerprints": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "normalized_hash": {"type": "string"},
+          "last_ts": {"type": "string"}
+        }
+      }
+    },
+    "log_cursors": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "inode": {"type": "integer"},
+          "offset": {"type": "integer"},
+          "last_ts": {"type": "string"},
+          "rotation_hint": {"enum": ["none", "rotated", "truncated"]}
+        }
+      }
+    },
+    "inventory_state": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "hash": {"type": "string"},
+          "count": {"type": "integer"},
+          "last_ts": {"type": "string"}
+        }
+      }
+    },
+    "chain_meta": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["report_id", "snapshot_type"],
+        "properties": {
+          "report_id": {"type": "string"},
+          "snapshot_type": {"enum": ["baseline", "delta"]},
+          "base_report_id": {"type": ["string", "null"]},
+          "chain_depth": {"type": "integer"},
+          "created_at": {"type": "string"}
+        }
+      }
+    }
+  }
+}

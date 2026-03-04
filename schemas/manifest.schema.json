@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keenetic-debug/schemas/manifest.schema.json",
+  "title": "Snapshot Manifest",
+  "description": "Манифест snapshot-архива — ТЗ п.4.12",
+  "type": "object",
+  "required": ["schema_id", "schema_version", "report_id", "created_at", "tool_version", "device", "modes", "files", "statistics"],
+  "properties": {
+    "schema_id": { "const": "keenetic-debug.manifest" },
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "report_id": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "tool_version": { "type": "string" },
+    "device": {
+      "type": "object",
+      "properties": {
+        "model": { "type": "string" },
+        "os_version": { "type": "string" },
+        "arch": { "enum": ["mipsel", "mips", "aarch64", "unknown"] },
+        "uptime_s": { "type": "integer" }
+      }
+    },
+    "modes": {
+      "type": "object",
+      "properties": {
+        "research": { "enum": ["light", "medium", "full", "extreme"] },
+        "performance": { "enum": ["lite", "middle", "hard", "auto"] }
+      },
+      "required": ["research", "performance"]
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "size_bytes", "sha256"],
+        "properties": {
+          "path": { "type": "string" },
+          "size_bytes": { "type": "integer", "minimum": 0 },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "source": { "type": "string" },
+          "collector_id": { "type": "string" }
+        }
+      }
+    },
+    "statistics": {
+      "type": "object",
+      "properties": {
+        "total_files": { "type": "integer" },
+        "total_size_bytes": { "type": "integer" },
+        "collectors_ok": { "type": "integer" },
+        "collectors_skip": { "type": "integer" },
+        "collectors_fail": { "type": "integer" },
+        "collectors_timeout": { "type": "integer" },
+        "duration_ms": { "type": "integer" },
+        "archive_size_bytes": { "type": "integer" }
+      }
+    },
+    "incremental": {
+      "type": "object",
+      "properties": {
+        "type": { "enum": ["baseline", "delta"] },
+        "parent_report_id": { "type": "string" },
+        "chain_depth": { "type": "integer" }
+      }
+    }
+  },
+  "additionalProperties": false
+}

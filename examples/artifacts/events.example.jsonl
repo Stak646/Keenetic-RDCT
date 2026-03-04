@@ -1,0 +1,6 @@
+{"ts":"2026-03-04T14:30:00Z","level":"INFO","module":"core","event_id":"session_start","message_key":"app.session_started","params":{"report_id":"kn3010-20260304T143022Z-a7f3","mode":"medium"},"correlation_id":"sess-a7f3"}
+{"ts":"2026-03-04T14:30:01Z","level":"INFO","module":"preflight","event_id":"preflight_done","message_key":"preflight.complete","params":{"included":14,"skipped":4},"correlation_id":"sess-a7f3","duration_ms":1200}
+{"ts":"2026-03-04T14:30:02Z","level":"INFO","module":"collector.system.base","event_id":"collector_start","message_key":"collector.started","params":{"collector_id":"system.base"},"correlation_id":"sess-a7f3"}
+{"ts":"2026-03-04T14:30:04Z","level":"INFO","module":"collector.system.base","event_id":"collector_done","message_key":"collector.finished","params":{"collector_id":"system.base","status":"OK"},"correlation_id":"sess-a7f3","duration_ms":2100}
+{"ts":"2026-03-04T14:30:30Z","level":"WARN","module":"governor","event_id":"throttle","message_key":"governor.throttled","params":{"reason":"high_load","loadavg":3.2},"correlation_id":"sess-a7f3"}
+{"ts":"2026-03-04T14:31:00Z","level":"INFO","module":"core","event_id":"session_end","message_key":"app.session_finished","params":{"report_id":"kn3010-20260304T143022Z-a7f3","status":"OK"},"correlation_id":"sess-a7f3","duration_ms":60000}

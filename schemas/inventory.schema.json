@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keenetic-debug/schemas/inventory.schema.json",
+  "title": "Inventory",
+  "description": "Инвентаризация: порт→процесс→пакет→конфиг→endpoint. Корреляционная карта.",
+  "type": "object",
+  "required": ["schema_id", "schema_version", "report_id", "timestamp", "entries"],
+  "properties": {
+    "schema_id": {"const": "inventory"},
+    "schema_version": {"type": "string", "pattern": "^[0-9]+$"},
+    "report_id": {"type": "string"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "device_fingerprint": {"type": "string"},
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["port", "proto", "bind_addr"],
+        "properties": {
+          "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+          "proto": {"enum": ["tcp", "udp", "tcp6", "udp6"]},
+          "bind_addr": {"type": "string"},
+          "pid": {"type": ["integer", "null"]},
+          "process_name": {"type": ["string", "null"]},
+          "executable": {"type": ["string", "null"]},
+          "cmdline": {"type": ["string", "null"]},
+          "opkg_package": {"type": ["string", "null"]},
+          "package_version": {"type": ["string", "null"]},
+          "config_paths": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "detected_endpoints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {"type": "string"},
+                "status_code": {"type": ["integer", "null"]},
+                "content_type": {"type": ["string", "null"]},
+                "etag": {"type": ["string", "null"]},
+                "last_modified": {"type": ["string", "null"]},
+                "confidence": {"enum": ["detected", "confirmed"]}
+              }
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {"type": "string"}
+          }
+        }
+      }
+    },
+    "rci": {
+      "type": "object",
+      "properties": {
+        "local": {"type": "boolean"},
+        "http_rci": {"type": "boolean"},
+        "interfaces": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "statistics": {
+      "type": "object",
+      "properties": {
+        "total_ports": {"type": "integer"},
+        "total_processes": {"type": "integer"},
+        "total_packages": {"type": "integer"},
+        "total_endpoints": {"type": "integer"}
+      }
+    }
+  }
+}

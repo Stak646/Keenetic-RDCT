@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keenetic-debug/schemas/bundle_info.schema.json",
+  "title": "Bundle Info",
+  "description": "Метаданные offline bundle.",
+  "type": "object",
+  "required": ["version", "arch", "components"],
+  "properties": {
+    "version": {"type": "string"},
+    "date": {"type": "string"},
+    "arch": {"enum": ["mipsel", "mips", "aarch64", "universal"]},
+    "channel": {"enum": ["stable", "beta"]},
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "sha256"],
+        "properties": {
+          "name": {"type": "string"},
+          "sha256": {"type": "string"},
+          "size": {"type": "integer"}
+        }
+      }
+    }
+  }
+}

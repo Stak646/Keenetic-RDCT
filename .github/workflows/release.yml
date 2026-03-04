@@ -1,0 +1,41 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [mipsel, mips, aarch64]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build offline bundle
+        run: |
+          VERSION=$(jq -r .version version.json)
+          ARCHIVE="keenetic-debug-${VERSION}-offline-${{ matrix.arch }}.tar.gz"
+          tar czf "$ARCHIVE" --exclude='.git*' --exclude='tests' .
+          sha256sum "$ARCHIVE" > "${ARCHIVE}.sha256"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.arch }}
+          path: keenetic-debug-*.tar.gz*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+      - name: Generate release manifest
+        run: |
+          scripts/release_manifest_gen.sh > release-manifest.json
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-*/keenetic-debug-*.tar.gz
+            release-*/keenetic-debug-*.tar.gz.sha256
+            release-manifest.json
+          generate_release_notes: true

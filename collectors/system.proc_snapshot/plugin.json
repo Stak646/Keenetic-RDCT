@@ -1,0 +1,25 @@
+{
+  "schema_id": "plugin",
+  "schema_version": "1",
+  "id": "system.proc_snapshot",
+  "name": "Process Snapshot",
+  "version": "1.0.0",
+  "contract_version": 1,
+  "category": "system",
+  "description_en": "Process snapshot: ps, top, process tree",
+  "description_ru": "Снимок процессов: ps/top, дерево процессов",
+  "supported_research_modes": ["light", "medium", "full", "extreme"],
+  "supported_perf_modes": ["lite", "middle", "hard", "auto"],
+  "requires_root": false,
+  "dangerous": false,
+  "dependencies": {
+    "commands": ["ps"],
+    "files": ["/proc/loadavg"],
+    "optional_fallbacks": {}
+  },
+  "estimated_cost": {"time_s": 5, "cpu_pct": 10, "ram_mb": 4, "io_mb": 1},
+  "timeout_s": 60,
+  "max_output_mb": 10,
+  "privacy_tags": ["ip","mac","logs"],
+  "incremental": {"key": "system.proc_snapshot", "strategy": "hybrid"}
+}

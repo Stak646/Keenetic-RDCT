@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "collectors": [
+    {"id": "system.base", "path": "system.base", "category": "system", "phase": "system"},
+    {"id": "system.proc_snapshot", "path": "system.proc_snapshot", "category": "system", "phase": "system"},
+    {"id": "system.system_info", "path": "system.system_info", "category": "system", "phase": "system"},
+    {"id": "logs.system", "path": "logs.system", "category": "logs", "phase": "logs"},
+    {"id": "config.keenetic_rci", "path": "config.keenetic_rci", "category": "config", "phase": "system"},
+    {"id": "config.entware", "path": "config.entware", "category": "config", "phase": "config"},
+    {"id": "opkg.status", "path": "opkg.status", "category": "config", "phase": "config"},
+    {"id": "hooks.ndm", "path": "hooks.ndm", "category": "hooks", "phase": "config"},
+    {"id": "services.entware", "path": "services.entware", "category": "services", "phase": "apps"},
+    {"id": "network.base", "path": "network.base", "category": "network", "phase": "network"},
+    {"id": "network.sockets", "path": "network.sockets", "category": "network", "phase": "network"},
+    {"id": "network.firewall", "path": "network.firewall", "category": "network", "phase": "network"},
+    {"id": "network.conntrack", "path": "network.conntrack", "category": "network", "phase": "network"},
+    {"id": "network.dhcp_dns", "path": "network.dhcp_dns", "category": "network", "phase": "network"},
+    {"id": "wifi.radio", "path": "wifi.radio", "category": "wifi", "phase": "wifi"},
+    {"id": "wifi.clients", "path": "wifi.clients", "category": "wifi", "phase": "wifi"},
+    {"id": "vpn.tunnels", "path": "vpn.tunnels", "category": "vpn", "phase": "network"},
+    {"id": "storage.map", "path": "storage.map", "category": "storage", "phase": "system"},
+    {"id": "storage.topn", "path": "storage.topn", "category": "storage", "phase": "system"},
+    {"id": "apps.websnap", "path": "apps.websnap", "category": "apps", "phase": "apps"},
+    {"id": "mirror.full", "path": "mirror.full", "category": "mirror", "phase": "mirror"},
+    {"id": "test.dummy", "path": "test.dummy", "category": "test", "phase": "test"},
+    {"id": "test.timeout", "path": "test.timeout", "category": "test", "phase": "test"},
+    {"id": "test.flood", "path": "test.flood", "category": "test", "phase": "test"},
+    {"id": "test.depmissing", "path": "test.depmissing", "category": "test", "phase": "test"}
+  ]
+}

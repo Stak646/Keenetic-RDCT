@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keenetic-debug/schemas/sbom.schema.json",
+  "title": "SBOM",
+  "description": "Software Bill of Materials — список компонентов/версий/хэшей в составе snapshot.",
+  "type": "object",
+  "required": ["schema_id", "schema_version", "tool_version", "components"],
+  "properties": {
+    "schema_id": {"const": "sbom"},
+    "schema_version": {"type": "string", "pattern": "^[0-9]+$"},
+    "tool_version": {"type": "string"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "version", "type"],
+        "properties": {
+          "name": {"type": "string"},
+          "version": {"type": "string"},
+          "type": {"enum": ["core", "module", "collector", "schema", "policy", "webui", "cli"]},
+          "file": {"type": "string"},
+          "sha256": {"type": ["string", "null"]},
+          "status": {"enum": ["active", "skipped", "failed"]}
+        }
+      }
+    },
+    "collectors_run": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string"},
+          "version": {"type": "string"},
+          "status": {"type": "string"},
+          "reason": {"type": ["string", "null"]}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://keenetic-debug/schemas/config.schema.json",
+  "schema_id": "keenetic-debug.config",
+  "schema_version": 1,
+  "research_mode": "medium",
+  "performance_mode": "auto",
+  "language": "ru",
+  "workdir": "/opt/var/keenetic-debug",
+  "output_dir": "/opt/var/keenetic-debug/reports",
+  "readonly": true,
+  "dangerous_ops": false,
+  "webui": {
+    "enabled": true,
+    "bind": "127.0.0.1",
+    "port_range": [5000, 5099],
+    "auth_token_file": "/opt/var/keenetic-debug/run/auth.token",
+    "csrf_enabled": true,
+    "rate_limit": {
+      "api_rpm": 120,
+      "heavy_rpm": 10
+    }
+  },
+  "governor": {
+    "max_cpu_pct": 50,
+    "max_ram_mb": 64,
+    "min_free_disk_mb": 50,
+    "max_workers": 2,
+    "watchdog_timeout_s": 600
+  },
+  "privacy": {
+    "redaction_mode": "auto",
+    "custom_rules": [],
+    "denylist": [
+      "/opt/var/keenetic-debug",
+      "*.tar.gz",
+      "*.zip",
+      "/tmp"
+    ]
+  },
+  "archive": {
+    "format": "tar.gz",
+    "compression_level": 6
+  },
+  "incremental": {
+    "enabled": true,
+    "chain_max_depth": 10,
+    "auto_rebase": true
+  },
+  "collectors": {
+    "enabled": "*",
+    "disabled": [],
+    "overrides": {}
+  }
+}

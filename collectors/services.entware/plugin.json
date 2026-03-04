@@ -1,0 +1,25 @@
+{
+  "schema_id": "plugin",
+  "schema_version": "1",
+  "id": "services.entware",
+  "name": "Entware Services",
+  "version": "1.0.0",
+  "contract_version": 1,
+  "category": "services",
+  "description_en": "Entware services: init.d scripts, status, autostart, PID/port correlation",
+  "description_ru": "Сервисы Entware: init.d скрипты, состояние, автозапуск",
+  "supported_research_modes": ["light", "medium", "full", "extreme"],
+  "supported_perf_modes": ["lite", "middle", "hard", "auto"],
+  "requires_root": false,
+  "dangerous": false,
+  "dependencies": {
+    "commands": [""],
+    "files": ["/opt/etc/init.d"],
+    "optional_fallbacks": {}
+  },
+  "estimated_cost": {"time_s": 10, "cpu_pct": 10, "ram_mb": 4, "io_mb": 2},
+  "timeout_s": 60,
+  "max_output_mb": 10,
+  "privacy_tags": ["logs"],
+  "incremental": {"key": "services.entware", "strategy": "hybrid"}
+}

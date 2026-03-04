@@ -1,0 +1,33 @@
+{
+  "schema_id": "plugin",
+  "schema_version": "1",
+  "id": "COLLECTOR_ID",
+  "name": "COLLECTOR_NAME",
+  "version": "1.0.0",
+  "contract_version": 1,
+  "category": "CATEGORY",
+  "description_en": "Description in English",
+  "description_ru": "Описание на русском",
+  "supported_research_modes": ["light", "medium", "full", "extreme"],
+  "supported_perf_modes": ["lite", "middle", "hard", "auto"],
+  "requires_root": false,
+  "dangerous": false,
+  "dependencies": {
+    "commands": [],
+    "files": [],
+    "optional_fallbacks": {}
+  },
+  "estimated_cost": {
+    "time_s": 10,
+    "cpu_pct": 5,
+    "ram_mb": 4,
+    "io_mb": 1
+  },
+  "timeout_s": 60,
+  "max_output_mb": 50,
+  "privacy_tags": [],
+  "incremental": {
+    "key": "COLLECTOR_ID",
+    "strategy": "hybrid"
+  }
+}

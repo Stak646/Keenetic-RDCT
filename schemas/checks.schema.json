@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keenetic-debug/schemas/checks.schema.json",
+  "title": "Checks Report",
+  "description": "Результаты diff-driven проверок: изменения, аномалии, дрейф.",
+  "type": "object",
+  "required": ["schema_id", "schema_version", "report_id", "base_report_id", "timestamp", "checks"],
+  "properties": {
+    "schema_id": {"const": "checks"},
+    "schema_version": {"type": "string", "pattern": "^[0-9]+$"},
+    "report_id": {"type": "string"},
+    "base_report_id": {"type": "string"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "summary": {
+      "type": "object",
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "critical": {"type": "integer", "minimum": 0},
+        "warn": {"type": "integer", "minimum": 0},
+        "info": {"type": "integer", "minimum": 0}
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "title"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Уникальный ID проверки: net.new_listen_port, config.drift, proc.new_binary, ..."
+          },
+          "severity": {"enum": ["INFO", "WARN", "CRIT"]},
+          "title": {"type": "string"},
+          "description": {"type": "string"},
+          "evidence": {
+            "type": "object",
+            "description": "Произвольные данные-доказательство"
+          },
+          "remediation_hint": {"type": "string"},
+          "privacy_tags": {
+            "type": "array",
+            "items": {"enum": ["ip", "mac", "ssid", "token", "password", "cookie", "key", "cert", "logs", "payload"]}
+          },
+          "category": {
+            "enum": [
+              "config_drift", "package_drift", "network_exposure",
+              "process_drift", "endpoint_drift", "wifi_regression",
+              "vpn_regression", "storage_growth", "log_anomaly",
+              "resource_anomaly", "self_mirror"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

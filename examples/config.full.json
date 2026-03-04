@@ -1,0 +1,144 @@
+{
+  "config_version": 1,
+  "research_mode": "medium",
+  "performance_mode": "auto",
+  "lang": "en",
+  "debug": false,
+  "readonly": true,
+  "dangerous_ops": false,
+  "dry_run": false,
+  "resume": true,
+  "snapshot_mode": "baseline",
+  "paths": {
+    "base_dir": "/opt/keenetic-debug",
+    "workdir": "auto",
+    "output_dir": "auto",
+    "run_dir": "auto",
+    "logs_dir": "auto"
+  },
+  "webui": {
+    "enabled": true,
+    "bind": "127.0.0.1",
+    "port": null,
+    "port_range_start": 5000,
+    "port_range_end": 5099,
+    "https": false,
+    "session_timeout_s": 3600,
+    "max_response_mb": 100,
+    "max_download_mb": 500,
+    "allowed_lan_cidrs": [],
+    "ui_expose_reports": true,
+    "rate_limits": {
+      "rps": 60,
+      "burst": 10,
+      "heavy_rps": 5,
+      "heavy_burst": 2
+    }
+  },
+  "governor": {
+    "cpu_limit_pct": 70,
+    "ram_limit_pct": 80,
+    "min_disk_free_mb": 50,
+    "max_workers": null,
+    "min_workers": 1,
+    "io_budget_mb_s": null,
+    "sampling_interval_s": 2,
+    "nice": 10,
+    "ionice_class": "best-effort",
+    "backoff_strategy": "linear"
+  },
+  "collectors": {
+    "parallel_group": {
+      "heavy_io": ["mirror.full", "storage.health"]
+    }
+  },
+  "mirror": {
+    "enabled": false,
+    "roots": ["/opt/etc"],
+    "max_depth": 10,
+    "max_files": 10000,
+    "max_total_mb": 500,
+    "max_file_mb": 10,
+    "follow_symlinks": false,
+    "denylist_file": "policies/denylist.json",
+    "allowlist": []
+  },
+  "privacy": {
+    "policy_file": "policies/privacy.json",
+    "custom_rules": [],
+    "preview_secrets": false,
+    "hash_ips": true,
+    "hash_macs": true,
+    "redact_paths": ["/opt/etc/openvpn/*", "/opt/etc/wireguard/*"],
+    "sanitize_export": true
+  },
+  "checks": {
+    "enabled": true,
+    "severity_levels": ["INFO", "WARN", "CRIT"],
+    "ruleset": "default",
+    "thresholds": {
+      "new_open_ports": 3,
+      "conntrack_growth": 50.0
+    },
+    "privacy_aware": true,
+    "emit_diffs": {
+      "inventory_delta": true,
+      "config_drift": true
+    }
+  },
+  "incremental": {
+    "base_policy": "last_baseline",
+    "base_report_id": null,
+    "chain_max_depth": 10,
+    "rebase_policy": "count",
+    "rebase_n": 10,
+    "rebase_size_mb": 500,
+    "state_db_path": "auto",
+    "diff_defaults": "hybrid",
+    "hash_important_configs": true,
+    "log_cursor_mode": "hybrid",
+    "tombstones_enabled": true,
+    "delta_packaging": "stream"
+  },
+  "adapters": {
+    "ndm": {"enabled": true, "timeout_s": 10},
+    "rcicli": {"enabled": true, "timeout_s": 10},
+    "http_rci": {"enabled": false, "timeout_s": 5, "bind_iface": null, "allowed_ifaces": []},
+    "ssh": {"enabled": false},
+    "dry_run": false,
+    "allow_active_checks": false,
+    "allowlist_endpoints": ["http://127.0.0.1:79/rci/"]
+  },
+  "storage": {
+    "usb_mount_required": false,
+    "usb_preferred": true,
+    "min_free_mb": 50,
+    "write_amplification_guard": true
+  },
+  "retention": {
+    "max_snapshots": 20,
+    "max_days": 90,
+    "policy": "oldest_first"
+  },
+  "crypto": {
+    "enabled": false,
+    "method": "passphrase",
+    "key_path": null,
+    "encrypt_snapshots": false,
+    "sign_manifests": false
+  },
+  "updates": {
+    "enabled": false,
+    "channel": "stable",
+    "auto_check": false,
+    "offline_bundle_path": null,
+    "pinned_release_manifest_url": null
+  },
+  "archive": {
+    "format": "tar.gz",
+    "compression_level": 6
+  },
+  "max_log_kb": 1024,
+  "usb_only": false,
+  "sandbox_mode": false
+}

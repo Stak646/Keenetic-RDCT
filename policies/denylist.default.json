@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "description": "Default denylist for mirror/collector scanning",
+  "rules": [
+    {"pattern": "/opt/keenetic-debug/run/*", "reason": "workdir"},
+    {"pattern": "/opt/keenetic-debug/var/*", "reason": "runtime data"},
+    {"pattern": "/opt/keenetic-debug/tmp/*", "reason": "temporary files"},
+    {"pattern": "*.tar.gz", "reason": "archive output"},
+    {"pattern": "*.zip", "reason": "archive output"},
+    {"pattern": "/proc/*", "reason": "pseudo-fs infinite"},
+    {"pattern": "/sys/*", "reason": "pseudo-fs infinite"},
+    {"pattern": "/dev/*", "reason": "device nodes"},
+    {"pattern": "/tmp/*", "reason": "temporary directory"},
+    {"pattern": "/var/tmp/*", "reason": "temporary directory"},
+    {"pattern": "*.swp", "reason": "editor swap files"},
+    {"pattern": ".git/*", "reason": "version control"},
+    {"pattern": "core.*", "reason": "core dumps"},
+    {"pattern": "*.pid", "reason": "pid files"}
+  ]
+}

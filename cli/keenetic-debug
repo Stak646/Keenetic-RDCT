@@ -1,0 +1,114 @@
+#!/bin/sh
+# keenetic-debug CLI entry point
+# Step 186, 274-276, 294, 299, 305-306, 316
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_DIR="$(dirname "$SCRIPT_DIR")"
+
+# Source modules
+. "$BASE_DIR/modules/i18n.sh" 2>/dev/null || true
+. "$BASE_DIR/modules/configurator.sh" 2>/dev/null || true
+. "$BASE_DIR/modules/logger.sh" 2>/dev/null || true
+
+VERSION=$(cat "$BASE_DIR/version.json" 2>/dev/null | grep '"version"' | sed 's/.*: *"\(.*\)".*/\1/' || echo "unknown")
+
+# Parse global flags
+_cli_lang=""
+_cli_json="false"
+_cli_verbose="false"
+_cli_quiet="false"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --lang) _cli_lang="$2"; shift 2 ;;
+    --json) _cli_json="true"; shift ;;
+    --verbose) _cli_verbose="true"; shift ;;
+    --quiet) _cli_quiet="true"; shift ;;
+    --version|-v)
+      echo "keenetic-debug $VERSION"
+      exit 0
+      ;;
+    --help|-h)
+      _cmd="help"; shift ;;
+    *)
+      _cmd="$1"; shift; break ;;
+  esac
+done
+
+# Init i18n (Step 294: CLI --lang > config.lang > $TOOL_LANG > $LANG > "en")
+I18N_DIR="$BASE_DIR/i18n"
+i18n_init "$_cli_lang" ""
+
+# Init config
+config_load "$BASE_DIR/config.json"
+[ -n "$_cli_lang" ] && config_set_cli "lang" "$_cli_lang"
+
+case "${_cmd:-help}" in
+  help|"")
+    echo "$(t 'cli.usage')"
+    echo ""
+    echo "Commands:"
+    echo "  start       $(t 'cli.cmd.start')"
+    echo "  report      $(t 'cli.cmd.report')"
+    echo "  config      $(t 'cli.cmd.config')"
+    echo "  chain       $(t 'cli.cmd.chain')"
+    echo "  checks      $(t 'cli.cmd.checks')"
+    echo "  inventory   $(t 'cli.cmd.inventory')"
+    echo "  app         $(t 'cli.cmd.app')"
+    echo "  sanitize    $(t 'cli.cmd.sanitize')"
+    echo "  preflight   $(t 'cli.cmd.preflight')"
+    echo ""
+    echo "Options:"
+    echo "  --lang ru|en   $(t 'cli.opt.lang')"
+    echo "  --json         $(t 'cli.opt.json')"
+    echo "  --verbose      $(t 'cli.opt.verbose')"
+    echo "  --quiet        $(t 'cli.opt.quiet')"
+    echo "  --version      Version"
+    echo ""
+    echo "Examples:"
+    echo "  $(t 'cli.example.start')"
+    echo "  $(t 'cli.example.report')"
+    ;;
+    
+  config)
+    subcmd="${1:-show}"
+    case "$subcmd" in
+      show)
+        # Step 274: effective config with source tracking
+        redact="false"
+        [ "$2" = "--redact" ] && redact="true"  # Step 305
+        config_show "$redact"
+        ;;
+      validate)
+        # Step 275: validate config.json
+        config_validate "$BASE_DIR/config.json" "$BASE_DIR/schemas/config.schema.json"
+        ;;
+      set)
+        # Step 276: safe set with backup+atomic rename
+        config_set_file "$BASE_DIR/config.json" "$2" "$3"
+        ;;
+      export)
+        # Step 306: sanitized export
+        config_show "true"
+        ;;
+      *)
+        echo "config subcommands: show [--redact], validate, set <path> <value>, export"
+        ;;
+    esac
+    ;;
+    
+  sanitize)
+    # Step 316
+    if [ -f "$BASE_DIR/cli/commands/sanitize.sh" ]; then
+      . "$BASE_DIR/cli/commands/sanitize.sh"
+      sanitize_report "$1"
+    else
+      echo "Sanitize: not yet implemented"
+    fi
+    ;;
+    
+  *)
+    echo "keenetic-debug: command '$_cmd' not yet implemented (stub)"
+    echo "$(t 'cli.usage')"
+    exit 1
+    ;;
+esac

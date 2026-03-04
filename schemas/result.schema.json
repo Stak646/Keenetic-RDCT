@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keenetic-debug/schemas/result.schema.json",
+  "title": "Collector Result",
+  "description": "Результат работы коллектора (result.json) — ТЗ п.4.8",
+  "type": "object",
+  "required": ["schema_id", "schema_version", "collector_id", "status", "started_at", "finished_at", "duration_ms"],
+  "properties": {
+    "schema_id": { "const": "keenetic-debug.collector.result" },
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "collector_id": { "type": "string" },
+    "status": { "enum": ["OK", "SKIP", "SOFT_FAIL", "HARD_FAIL", "TIMEOUT"] },
+    "reason": { "type": "string", "description": "Reason for non-OK status" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "duration_ms": { "type": "integer", "minimum": 0 },
+    "output_size_bytes": { "type": "integer", "minimum": 0 },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "cpu_pct_est": { "type": "number" },
+        "io_mb": { "type": "number" },
+        "timeout_hit": { "type": "boolean" },
+        "retries": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "data": {
+      "description": "Collector-specific structured data",
+      "type": "object",
+      "additionalProperties": true
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "size_bytes"],
+        "properties": {
+          "path": { "type": "string" },
+          "size_bytes": { "type": "integer" },
+          "sha256": { "type": "string" },
+          "content_type": { "type": "string" }
+        }
+      }
+    },
+    "fingerprint": {
+      "description": "For incremental: state fingerprint for delta detection",
+      "type": "object",
+      "properties": {
+        "hash": { "type": "string" },
+        "mtime": { "type": "string" },
+        "size": { "type": "integer" },
+        "cursor": { "type": "string" }
+      }
+    }
+  },
+  "additionalProperties": false
+}
