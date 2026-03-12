@@ -190,23 +190,32 @@ download_project() {
 setup_token() {
   local token_file="$PREFIX/var/.auth_token"
 
+  # Read existing token if present
   if [ -f "$token_file" ]; then
+    AUTH_TOKEN=$(cat "$token_file" 2>/dev/null | tr -d '\n\r ')
+  fi
+
+  # Validate: must be non-empty and at least 16 chars
+  if [ -n "$AUTH_TOKEN" ] && [ "${#AUTH_TOKEN}" -ge 16 ]; then
     log "Auth token exists (preserved)"
-    AUTH_TOKEN=$(cat "$token_file")
     return
   fi
 
-  # Generate random token (BusyBox-compatible, no od -A)
+  # Generate new token (BusyBox-compatible)
+  log "Generating auth token..."
   if command -v openssl >/dev/null 2>&1; then
     AUTH_TOKEN=$(openssl rand -hex 24)
   elif [ -r /proc/sys/kernel/random/uuid ]; then
-    # Use kernel UUID — available on all Linux
     AUTH_TOKEN=$(cat /proc/sys/kernel/random/uuid | tr -d '-')$(cat /proc/sys/kernel/random/uuid | tr -d '-' | cut -c1-16)
-  elif [ -r /dev/urandom ]; then
-    AUTH_TOKEN=$(hexdump -n 24 -e '24/1 "%02x"' /dev/urandom 2>/dev/null || \
-                 head -c 24 /dev/urandom | od -tx1 | head -3 | awk '{$1="";print}' | tr -d ' \n')
+  elif command -v hexdump >/dev/null 2>&1 && [ -r /dev/urandom ]; then
+    AUTH_TOKEN=$(hexdump -n 24 -e '24/1 "%02x"' /dev/urandom 2>/dev/null)
   else
     AUTH_TOKEN="$(date +%s)$(cat /proc/uptime 2>/dev/null | tr -d '. ')"
+  fi
+
+  # Ensure non-empty
+  if [ -z "$AUTH_TOKEN" ] || [ "${#AUTH_TOKEN}" -lt 16 ]; then
+    AUTH_TOKEN="change_me_$(date +%s)"
   fi
 
   echo "$AUTH_TOKEN" > "$token_file"
@@ -442,8 +451,8 @@ with socketserver.TCPServer((BIND, PORT), Handler) as httpd:
     httpd.serve_forever()
 PYEOF
 
-  # Launch in background
-  nohup python3 "$PREFIX/run/server.py" > "$PREFIX/logs/webui.log" 2>&1 &
+  # Launch in background (no nohup in BusyBox — redirect handles it)
+  python3 "$PREFIX/run/server.py" > "$PREFIX/logs/webui.log" 2>&1 &
   local pid=$!
   echo "$pid" > "$PREFIX/run/webui.pid"
 
@@ -475,26 +484,38 @@ PREFIX="$PREFIX"
 PIDFILE="\$PREFIX/run/webui.pid"
 
 start() {
-  if [ -f "\$PIDFILE" ] && kill -0 \$(cat "\$PIDFILE") 2>/dev/null; then
-    echo "Already running"
-    return
+  if [ -f "\$PIDFILE" ]; then
+    local oldpid=\$(cat "\$PIDFILE" 2>/dev/null || echo "")
+    if [ -n "\$oldpid" ] && kill -0 "\$oldpid" 2>/dev/null; then
+      echo "Already running (PID \$oldpid)"
+      return
+    fi
+    rm -f "\$PIDFILE"
   fi
   echo "Starting keenetic-debug WebUI..."
   if command -v python3 >/dev/null 2>&1 && [ -f "\$PREFIX/run/server.py" ]; then
-    nohup python3 "\$PREFIX/run/server.py" > "\$PREFIX/logs/webui.log" 2>&1 &
+    python3 "\$PREFIX/run/server.py" > "\$PREFIX/logs/webui.log" 2>&1 &
     echo "\$!" > "\$PIDFILE"
-    sleep 1
-    echo "Started"
+    sleep 2
+    local newpid=\$(cat "\$PIDFILE" 2>/dev/null || echo "")
+    if [ -n "\$newpid" ] && kill -0 "\$newpid" 2>/dev/null; then
+      [ -f "\$PREFIX/run/webui.port" ] && echo "Started: http://\$(ip -4 addr show br0 2>/dev/null | awk '/inet /{split(\$2,a,"/");print a[1]}' || echo 192.168.1.1):\$(cat \$PREFIX/run/webui.port)"
+    else
+      echo "Failed — check \$PREFIX/logs/webui.log"
+    fi
   else
-    echo "python3 not found"
+    echo "python3 not found — install: opkg install python3-light"
   fi
 }
 
 stop() {
   if [ -f "\$PIDFILE" ]; then
-    kill \$(cat "\$PIDFILE") 2>/dev/null
+    local pid=\$(cat "\$PIDFILE" 2>/dev/null || echo "")
+    [ -n "\$pid" ] && kill "\$pid" 2>/dev/null
     rm -f "\$PIDFILE"
     echo "Stopped"
+  else
+    echo "Not running"
   fi
 }
 
@@ -503,9 +524,15 @@ case "\${1:-start}" in
   stop)    stop ;;
   restart) stop; sleep 1; start ;;
   status)
-    if [ -f "\$PIDFILE" ] && kill -0 \$(cat "\$PIDFILE") 2>/dev/null; then
-      echo "Running (PID \$(cat "\$PIDFILE"))"
-      [ -f "\$PREFIX/run/webui.port" ] && echo "Port: \$(cat "\$PREFIX/run/webui.port")"
+    if [ -f "\$PIDFILE" ]; then
+      local spid=\$(cat "\$PIDFILE" 2>/dev/null || echo "")
+      if [ -n "\$spid" ] && kill -0 "\$spid" 2>/dev/null; then
+        echo "Running (PID \$spid)"
+        [ -f "\$PREFIX/run/webui.port" ] && echo "Port: \$(cat \$PREFIX/run/webui.port)"
+      else
+        echo "Stopped (stale PID)"
+        rm -f "\$PIDFILE"
+      fi
     else
       echo "Stopped"
     fi
