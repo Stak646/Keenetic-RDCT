@@ -133,7 +133,7 @@ code{background:var(--bg);padding:1px 5px;border-radius:3px;font-size:12px}
 <div class="card"><h4>WebUI</h4><div class="val stat-accent" id="dPort">—</div><div class="sub" id="dBind"></div></div>
 </div>
 <div class="actions">
-<button class="btn btn-primary" onclick="apiPost('/api/start')" data-t="btn.start">▶ Запустить сбор</button>
+<button class="btn btn-primary" onclick="startRun()" data-t="btn.start">▶ Запустить сбор</button>
 <button class="btn btn-danger" onclick="apiPost('/api/stop')" data-t="btn.stop">⏹ Остановить</button>
 <button class="btn btn-ghost" onclick="go('preflight')" data-t="btn.preflight">Preflight</button>
 </div>
@@ -283,13 +283,25 @@ try{const r=await api('/api/reports');$('#dRep').textContent=r.reports?r.reports
 try{const c=await api('/api/config');$('#dMode').textContent=(c.research_mode||'—').toUpperCase();$('#dPerf').textContent=c.performance_mode||''}catch{}}
 
 async function loadPreflight(){
-$('#pfEnv').innerHTML='<div class="loader">Загрузка...</div>';
-try{const d=await api('/api/device');
-$('#pfEnv').innerHTML=`<table><tr><td><b>Arch</b></td><td>${d.arch||'?'}</td></tr><tr><td><b>Kernel</b></td><td>${d.kernel||'?'}</td></tr><tr><td><b>Hostname</b></td><td>${d.hostname||'?'}</td></tr></table>`}catch{$('#pfEnv').textContent='—'}
-// Warnings and plan would come from /api/preflight when implemented
-$('#pfWarn').innerHTML='<p style="color:var(--muted)">Запустите preflight через CLI для получения данных</p>';
-$('#pfEst').innerHTML='<p style="color:var(--muted)">Оценка будет доступна после preflight</p>';
-$('#pfPlan').innerHTML='<p style="color:var(--muted)">План формируется при запуске preflight</p>'}
+$('#pfEnv').innerHTML='<div class="loader">Запуск preflight...</div>';
+$('#pfWarn').innerHTML='';$('#pfEst').innerHTML='';$('#pfPlan').innerHTML='';
+try{const d=await apiPost('/api/preflight/run',{});
+let capH='<table>';
+for(const[k,v] of Object.entries(d.capabilities||{})){
+capH+=`<tr><td><code>${k}</code></td><td>${v?'<span class="tag tag-ok">✅</span>':'<span class="tag tag-fail">❌</span>'}</td></tr>`}
+capH+='</table>';$('#pfEnv').innerHTML=capH;
+let wH='';
+for(const w of (d.warnings||[])){
+const cls=w.severity==='CRIT'?'badge-crit':'badge-warn';
+wH+=`<div style="margin:4px 0"><span class="badge ${cls}">${w.severity}</span> ${w.msg}</div>`}
+$('#pfWarn').innerHTML=wH||'<span style="color:var(--muted)">Нет предупреждений</span>';
+$('#pfEst').innerHTML=`<table><tr><td>Диск свободно</td><td><b>${d.disk_free_mb||'?'} MB</b></td></tr><tr><td>RAM свободно</td><td><b>${((d.ram_free_kb||0)/1024).toFixed(0)} MB</b></td></tr></table>`;
+let plH='<table><tr><th>Collector</th><th>Статус</th><th>Причина</th><th>Timeout</th></tr>';
+for(const c of (d.collectors||[])){
+const tag=c.status==='INCLUDE'?'tag-ok':'tag-skip';
+plH+=`<tr><td><code>${c.id}</code></td><td><span class="tag ${tag}">${c.status}</span></td><td style="color:var(--muted)">${c.reason}</td><td>${c.timeout_s}s</td></tr>`}
+plH+='</table>';$('#pfPlan').innerHTML=plH;
+}catch(e){$('#pfEnv').innerHTML='<p style="color:var(--red)">Ошибка: '+e.message+'</p>'}}
 
 async function loadProgress(){
 try{const s=await api('/api/progress');
@@ -376,16 +388,77 @@ h+='</div>';$('#chainView').innerHTML=h}catch{$('#chainView').textContent='Ош�
 
 async function loadDevice(){
 try{const d=await api('/api/device');
-$('#devGrid').innerHTML=Object.entries(d).map(([k,v])=>`<div class="card"><h4>${k}</h4><div class="val" style="font-size:16px;word-break:break-all">${v}</div></div>`).join('');
-$('#devRaw').textContent=JSON.stringify(d,null,2)}catch{$('#devRaw').textContent='Ошибка'}}
+const nice=[
+['model','Модель','📱'],['model_title','Название','🏷️'],['firmware','Прошивка','💿'],
+['arch','Архитектура','🔧'],['kernel','Ядро','⚙️'],['hostname','Имя хоста','🖥️'],
+['uptime_human','Аптайм','⏱️'],['ram_total_mb','RAM (МБ)','💾'],['ram_used_pct','RAM %','📊'],
+['load_1m','Load 1m','📈'],['load_5m','Load 5m','📈'],['load_15m','Load 15m','📈'],
+['cpu_count','Ядра CPU','🧮'],['cpu_model','CPU','🏗️'],['temp_c','Температура °C','🌡️'],
+['disk_total_mb','Диск всего МБ','💽'],['disk_free_mb','Диск свободно МБ','💽'],
+['entware','Entware','📦'],['region','Регион','🌍']
+];
+let h='';
+for(const[k,label,icon] of nice){
+  let v=d[k];if(v===undefined||v===null||v==='')continue;
+  if(typeof v==='boolean')v=v?'✅ Да':'❌ Нет';
+  if(k==='ram_used_pct')v=v+'%';
+  h+=`<div class="card"><h4>${icon} ${label}</h4><div class="val" style="font-size:16px;word-break:break-all">${v}</div></div>`}
+$('#devGrid').innerHTML=h||'<p style="color:var(--muted)">Нет данных</p>';
+$('#devRaw').textContent=JSON.stringify(d,null,2)}catch(e){$('#devRaw').textContent='Ошибка: '+e.message}}
 
 async function loadApps(){
-$('#appList').innerHTML='<p style="color:var(--muted)">Список сервисов формируется из данных collectors.<br>Запустите сбор для получения информации о сервисах.</p>'}
+try{const d=await api('/api/apps');
+if(!d.apps||!d.apps.length){$('#appList').innerHTML='<p style="color:var(--muted)">Не удалось загрузить список</p>';return}
+let h='';
+for(const a of d.apps){
+const stTag=a.installed?(a.running?'<span class="tag tag-ok">Running</span>':'<span class="tag tag-warn">Stopped</span>'):'<span class="tag tag-skip">Not installed</span>';
+const conflict=a.conflict_warning?`<div style="color:var(--red);font-size:12px;margin:4px 0">⚠️ ${a.conflict_warning}</div>`:'';
+const legacy=a.upgrade_hint?`<div style="color:var(--yellow);font-size:12px;margin:4px 0">⬆️ ${a.upgrade_hint}</div>`:'';
+const ver=a.version?` v${a.version}`:'';
+h+=`<div class="card" style="margin-bottom:12px">
+<div style="display:flex;justify-content:space-between;align-items:center">
+<div><span style="font-size:20px">${a.icon||'📦'}</span> <b>${a.name}</b>${ver} ${stTag}</div></div>
+<div style="color:var(--muted);font-size:12px;margin:6px 0">${LANG==='ru'?(a.description_ru||''):(a.description_en||'')}</div>
+${conflict}${legacy}
+<div class="actions" style="margin-top:8px;margin-bottom:0">
+${!a.installed?`<button class="btn btn-primary btn-sm" onclick="appAction('${a.id}','install')">Установить</button>`:''}
+${a.installed?`<button class="btn btn-success btn-sm" onclick="appAction('${a.id}','start')">▶</button>
+<button class="btn btn-danger btn-sm" onclick="appAction('${a.id}','stop')">⏹</button>
+<button class="btn btn-warn btn-sm" onclick="appAction('${a.id}','restart')">🔄</button>
+<button class="btn btn-ghost btn-sm" onclick="appAction('${a.id}','remove')">🗑</button>`:''}
+</div>
+<pre id="app-out-${a.id}" style="display:none;margin-top:8px;max-height:200px"></pre></div>`}
+$('#appList').innerHTML=h}catch(e){$('#appList').innerHTML='<p style="color:var(--red)">'+e.message+'</p>'}}
+
+async function appAction(aid,act){
+const el=$('#app-out-'+aid);el.style.display='block';el.textContent='Выполняется...';
+try{let r;
+if(act==='install')r=await apiPost('/api/app/install',{app_id:aid});
+else if(act==='remove'){if(!confirm('Удалить?'))return;r=await apiPost('/api/app/remove',{app_id:aid})}
+else r=await apiPost('/api/app/control',{app_id:aid,action:act});
+el.textContent=r.output||r.status||JSON.stringify(r);
+setTimeout(()=>loadApps(),3000)}catch(e){el.textContent='Error: '+e.message}}
 
 async function loadSettings(){
-try{const c=await api('/api/config');$('#setCfg').textContent=JSON.stringify(c,null,2)}catch{$('#setCfg').textContent='Ошибка'}}
+try{const c=await api('/api/config');
+$('#setCfg').innerHTML=`<textarea id="cfgEdit" style="width:100%;height:400px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:12px;font-family:monospace;font-size:12px;resize:vertical">${JSON.stringify(c,null,2)}</textarea>
+<div class="actions" style="margin-top:10px"><button class="btn btn-primary" onclick="saveCfg()">💾 Сохранить</button><button class="btn btn-ghost" onclick="loadSettings()">↩ Сбросить</button></div>`}catch{$('#setCfg').textContent='Ошибка'}}
+
+async function saveCfg(){try{const d=JSON.parse($('#cfgEdit').value);
+const r=await apiPost('/api/config',d);
+alert(r.status==='saved'?'✅ Сохранено':'❌ '+(r.error||'Ошибка'))}catch(e){alert('❌ JSON: '+e.message)}}
 
 /* ========== INIT ========== */
+async function startRun(){
+const mode=prompt(LANG==='ru'?'Режим исследования (light/medium/full/extreme):':'Research mode (light/medium/full/extreme):','light');
+if(!mode)return;
+const perf=prompt(LANG==='ru'?'Режим производительности (lite/middle/hard/auto):':'Performance mode (lite/middle/hard/auto):','lite');
+if(!perf)return;
+try{const r=await apiPost('/api/start',{mode,perf});
+if(r.report_id)alert((LANG==='ru'?'✅ Сбор запущен: ':'✅ Started: ')+r.report_id);
+else alert('❌ '+(r.error||JSON.stringify(r)));
+setTimeout(()=>{go('progress')},1000)}catch(e){alert('❌ '+e.message)}}
+
 function initApp(){applyI18n();loadDash();setInterval(()=>{if(CUR_PAGE==='dash')loadDash();if(CUR_PAGE==='progress')loadProgress()},5000)}
 
 // Auto-auth from localStorage or URL

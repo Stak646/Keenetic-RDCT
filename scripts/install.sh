@@ -313,207 +313,13 @@ start_webui() {
 
   log "Starting WebUI on port $WEBUI_PORT..."
 
-  # Create the WebUI server script
-  cat > "$PREFIX/run/server.py" << PYEOF
-import http.server, socketserver, os, json, sys, time
+  # Use standalone server.py from web/server.py
+  export RDCT_PORT="$WEBUI_PORT"
+  export RDCT_BIND="0.0.0.0"
+  export RDCT_PREFIX="$PREFIX"
 
-PORT = $WEBUI_PORT
-BIND = "0.0.0.0"
-PREFIX = "$PREFIX"
-STATIC = os.path.join(PREFIX, "web", "static")
-TOKEN_FILE = os.path.join(PREFIX, "var", ".auth_token")
-
-def load_token():
-    try:
-        return open(TOKEN_FILE).read().strip()
-    except:
-        return ""
-
-class Handler(http.server.SimpleHTTPRequestHandler):
-    def __init__(self, *a, **kw):
-        super().__init__(*a, directory=STATIC, **kw)
-
-    def check_auth(self):
-        token = load_token()
-        if not token:
-            return True
-        auth = self.headers.get("Authorization", "")
-        if auth == f"Bearer {token}":
-            return True
-        # Allow token in query string for browser access
-        if "?" in self.path:
-            qs = self.path.split("?", 1)[1]
-            if f"token={token}" in qs:
-                return True
-        return False
-
-    def send_json(self, data, code=200):
-        body = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        self.wfile.write(body)
-
-    def send_file_as_json(self, path):
-        try:
-            with open(path) as f:
-                self.send_json(json.load(f))
-        except:
-            self.send_json({"error": "file not found"}, 404)
-
-    def do_GET(self):
-        path = self.path.split("?")[0]
-
-        # Health — no auth
-        if path == "/health":
-            ver = "unknown"
-            try: ver = open(os.path.join(PREFIX, "VERSION")).read().strip()
-            except: pass
-            self.send_json({"status": "ok", "version": ver, "port": PORT})
-            return
-
-        # API routes — require auth
-        if path.startswith("/api/"):
-            if not self.check_auth():
-                self.send_json({"error": "unauthorized"}, 401)
-                return
-
-            if path == "/api/progress":
-                sf = os.path.join(PREFIX, "run", "state.json")
-                if os.path.exists(sf):
-                    self.send_file_as_json(sf)
-                else:
-                    self.send_json({"state": "idle"})
-
-            elif path == "/api/reports":
-                rdir = os.path.join(PREFIX, "reports")
-                reports = []
-                if os.path.isdir(rdir):
-                    for d in sorted(os.listdir(rdir), reverse=True):
-                        dp = os.path.join(rdir, d)
-                        if os.path.isdir(dp):
-                            size = sum(os.path.getsize(os.path.join(dp,f)) for f in os.listdir(dp) if os.path.isfile(os.path.join(dp,f)))
-                            reports.append({"id": d, "size_bytes": size})
-                self.send_json({"reports": reports})
-
-            elif path.startswith("/api/report/") and path.endswith("/manifest"):
-                rid = path.split("/")[3]
-                self.send_file_as_json(os.path.join(PREFIX, "reports", rid, "manifest.json"))
-
-            elif path.startswith("/api/report/") and path.endswith("/checks"):
-                rid = path.split("/")[3]
-                self.send_file_as_json(os.path.join(PREFIX, "reports", rid, "checks.json"))
-
-            elif path.startswith("/api/report/") and path.endswith("/inventory"):
-                rid = path.split("/")[3]
-                self.send_file_as_json(os.path.join(PREFIX, "reports", rid, "inventory.json"))
-
-            elif path == "/api/preflight":
-                self.send_json({"message": "Run: keenetic-debug preflight"})
-
-            elif path.startswith("/api/i18n/"):
-                lang = path.split("/")[-1]
-                lf = os.path.join(PREFIX, "i18n", f"{lang}.json")
-                if os.path.exists(lf):
-                    self.send_file_as_json(lf)
-                else:
-                    self.send_json({})
-
-            elif path == "/api/config":
-                cf = os.path.join(PREFIX, "config.json")
-                if os.path.exists(cf):
-                    self.send_file_as_json(cf)
-                else:
-                    self.send_json({})
-
-            elif path == "/api/device":
-                import subprocess, platform
-                def _run(cmd):
-                    try: return subprocess.check_output(cmd, shell=True, timeout=5).decode().strip()
-                    except: return "unknown"
-                info = {
-                    "arch": platform.machine(),
-                    "kernel": platform.release(),
-                    "hostname": platform.node(),
-                    "uptime": _run("cat /proc/uptime 2>/dev/null | awk '{print \$1}'"),
-                    "total_ram_kb": _run("awk '/MemTotal/{print \$2}' /proc/meminfo"),
-                    "free_ram_kb": _run("awk '/MemAvailable/{print \$2}' /proc/meminfo"),
-                    "cpu_model": _run("awk -F: '/system type|machine/{gsub(/^ +/,\"\",\$2);print \$2;exit}' /proc/cpuinfo"),
-                    "loadavg": _run("cat /proc/loadavg"),
-                    "entware": os.path.exists("/opt/bin/opkg"),
-                    "disk_free_mb": _run("df -m /opt 2>/dev/null | tail -1 | awk '{print \$4}'"),
-                }
-                self.send_json(info)
-
-            elif path.startswith("/api/report/") and path.endswith("/redaction"):
-                rid = path.split("/")[3]
-                self.send_file_as_json(os.path.join(PREFIX, "reports", rid, "redaction_report.json"))
-
-            elif path.startswith("/api/report/") and path.endswith("/summary"):
-                rid = path.split("/")[3]
-                self.send_file_as_json(os.path.join(PREFIX, "reports", rid, "summary.json"))
-
-            elif path.startswith("/api/report/") and path.endswith("/preflight"):
-                rid = path.split("/")[3]
-                self.send_file_as_json(os.path.join(PREFIX, "reports", rid, "preflight.json"))
-
-            elif path.startswith("/api/report/") and path.endswith("/plan"):
-                rid = path.split("/")[3]
-                self.send_file_as_json(os.path.join(PREFIX, "reports", rid, "plan.json"))
-
-            else:
-                self.send_json({"error": "not found"}, 404)
-            return
-
-        # Static files
-        super().do_GET()
-
-    def do_POST(self):
-        path = self.path.split("?")[0]
-        if not self.check_auth():
-            self.send_json({"error": "unauthorized"}, 401)
-            return
-
-        import subprocess
-        if path == "/api/start":
-            try:
-                subprocess.Popen([os.path.join(PREFIX, "cli", "keenetic-debug"), "start"],
-                    stdout=open(os.path.join(PREFIX, "logs", "run.log"), "w"),
-                    stderr=subprocess.STDOUT)
-                self.send_json({"status": "started"})
-            except Exception as e:
-                self.send_json({"error": str(e)}, 500)
-
-        elif path == "/api/stop":
-            sf = os.path.join(PREFIX, "run", "state.json")
-            try:
-                with open(sf, "w") as f: json.dump({"state": "CANCELLED"}, f)
-                self.send_json({"status": "stop_requested"})
-            except Exception as e:
-                self.send_json({"error": str(e)}, 500)
-
-        elif path == "/api/chain/rebase":
-            self.send_json({"status": "rebase_requested", "note": "Use CLI: keenetic-debug chain rebase"})
-
-        elif path == "/api/chain/compact":
-            self.send_json({"status": "compact_requested", "note": "Use CLI: keenetic-debug chain compact"})
-
-        else:
-            self.send_json({"error": "not found"}, 404)
-
-    def log_message(self, fmt, *args):
-        pass  # Silence
-
-print(f"WebUI listening on {BIND}:{PORT}", flush=True)
-socketserver.TCPServer.allow_reuse_address = True
-with socketserver.TCPServer((BIND, PORT), Handler) as httpd:
-    httpd.serve_forever()
-PYEOF
-
-  # Launch in background (no nohup in BusyBox — redirect handles it)
-  python3 "$PREFIX/run/server.py" > "$PREFIX/logs/webui.log" 2>&1 &
+  # Launch in background
+  python3 "$PREFIX/web/server.py" > "$PREFIX/logs/webui.log" 2>&1 &
   local pid=$!
   echo "$pid" > "$PREFIX/run/webui.pid"
 
@@ -524,6 +330,7 @@ PYEOF
     return 0
   else
     err "WebUI failed to start. Check: $PREFIX/logs/webui.log"
+    cat "$PREFIX/logs/webui.log" 2>/dev/null | tail -5 >&2
     return 1
   fi
 }
@@ -554,8 +361,9 @@ start() {
     rm -f "\$PIDFILE"
   fi
   echo "Starting keenetic-debug WebUI..."
-  if command -v python3 >/dev/null 2>&1 && [ -f "\$PREFIX/run/server.py" ]; then
-    python3 "\$PREFIX/run/server.py" > "\$PREFIX/logs/webui.log" 2>&1 &
+  if command -v python3 >/dev/null 2>&1 && [ -f "\$PREFIX/web/server.py" ]; then
+    local wport=\$(cat "\$PREFIX/run/webui.port" 2>/dev/null || echo "5000")
+    RDCT_PORT=\$wport RDCT_PREFIX="\$PREFIX" RDCT_BIND="0.0.0.0" python3 "\$PREFIX/web/server.py" > "\$PREFIX/logs/webui.log" 2>&1 &
     echo "\$!" > "\$PIDFILE"
     sleep 2
     local newpid=\$(cat "\$PIDFILE" 2>/dev/null || echo "")
@@ -673,6 +481,181 @@ print_banner() {
 }
 
 # ============================================================================
+# INTERACTIVE MENU
+# ============================================================================
+ask() {
+  local prompt="$1" default="$2"
+  printf "${CYAN}  %s${NC} [%s]: " "$prompt" "$default"
+  read -r ans </dev/tty 2>/dev/null || ans=""
+  echo "${ans:-$default}"
+}
+
+ask_yn() {
+  local prompt="$1" default="${2:-y}"
+  local ans
+  ans=$(ask "$prompt (y/n)" "$default")
+  case "$ans" in [yY]*) return 0 ;; *) return 1 ;; esac
+}
+
+interactive_menu() {
+  echo ""
+  printf "${BOLD}  Выберите режим / Choose mode:${NC}\n"
+  echo ""
+  echo "    1) Полная установка (рекомендуется)"
+  echo "       Full install (recommended)"
+  echo ""
+  echo "    2) Только обновить / Update only"
+  echo ""
+  echo "    3) Удалить / Uninstall"
+  echo ""
+  echo "    4) Установить доп. приложения"
+  echo "       Install extra apps"
+  echo ""
+  local choice
+  choice=$(ask "Выбор / Choice" "1")
+  echo ""
+
+  case "$choice" in
+    1) do_full_install ;;
+    2) do_update ;;
+    3) do_uninstall ;;
+    4) do_install_apps ;;
+    *) do_full_install ;;
+  esac
+}
+
+do_full_install() {
+  log "Полная установка / Full install..."
+
+  install_deps
+  download_project
+  setup_token
+  setup_config
+  write_version
+  install_service
+  start_webui || warn "WebUI не запущен"
+
+  # Ask about extra apps
+  echo ""
+  if ask_yn "Установить дополнительные приложения? / Install extra apps?"; then
+    do_install_apps
+  fi
+
+  print_banner
+}
+
+do_update() {
+  log "Обновление / Updating..."
+  download_project
+  write_version
+
+  # Restart WebUI
+  if [ -f "$PREFIX/run/webui.pid" ]; then
+    local pid
+    pid=$(cat "$PREFIX/run/webui.pid" 2>/dev/null || echo "")
+    [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+    sleep 1
+  fi
+  start_webui || warn "WebUI не запущен"
+  print_banner
+}
+
+do_uninstall() {
+  warn "Удаление Keenetic-RDCT / Uninstalling..."
+  if ! ask_yn "Вы уверены? / Are you sure?" "n"; then
+    echo "Отменено / Cancelled"
+    return
+  fi
+
+  # Stop
+  if [ -f "$PREFIX/run/webui.pid" ]; then
+    kill "$(cat "$PREFIX/run/webui.pid" 2>/dev/null)" 2>/dev/null || true
+  fi
+  if [ -f /opt/etc/init.d/S99keeneticrdct ]; then
+    /opt/etc/init.d/S99keeneticrdct stop 2>/dev/null || true
+    rm -f /opt/etc/init.d/S99keeneticrdct
+  fi
+  rm -rf "$PREFIX"
+  log "Удалено / Removed: $PREFIX"
+}
+
+do_install_apps() {
+  echo ""
+  printf "${BOLD}  Доступные приложения / Available apps:${NC}\n"
+  echo ""
+  echo "    1) 🛡️  NFQWS Keenetic (Anonym-tsk/nfqws-keenetic)"
+  echo "    2) 🛡️  NFQWS2 Keenetic (nfqws/nfqws2-keenetic)"
+  echo "    3) 🌐  NFQWS Keenetic Web (nfqws/nfqws-keenetic-web)"
+  echo "    4) 🐉  HydraRoute Neo (Ground-Zerro/HydraRoute)"
+  echo "    5) 🎩  MagiTrickle (MagiTrickle/MagiTrickle)"
+  echo "    6) 🔐  AWG Manager (hoaxisr/awg-manager)"
+  echo "    0) Пропустить / Skip"
+  echo ""
+  local choice
+  choice=$(ask "Номер(а) через пробел / Number(s)" "0")
+
+  for c in $choice; do
+    case "$c" in
+      1)
+        log "Installing NFQWS Keenetic..."
+        mkdir -p /opt/etc/opkg
+        echo 'src/gz nfqws-keenetic https://anonym-tsk.github.io/nfqws-keenetic/all' > /opt/etc/opkg/nfqws-keenetic.conf
+        opkg update 2>/dev/null; opkg install nfqws-keenetic 2>&1
+        ;;
+      2)
+        log "Installing NFQWS2 Keenetic..."
+        mkdir -p /opt/etc/opkg
+        echo 'src/gz nfqws2-keenetic https://nfqws.github.io/nfqws2-keenetic/all' > /opt/etc/opkg/nfqws2-keenetic.conf
+        opkg update 2>/dev/null; opkg install nfqws2-keenetic 2>&1
+        ;;
+      3)
+        log "Installing NFQWS Keenetic Web..."
+        mkdir -p /opt/etc/opkg
+        echo 'src/gz nfqws-keenetic-web https://nfqws.github.io/nfqws-keenetic-web/all' > /opt/etc/opkg/nfqws-keenetic-web.conf
+        opkg update 2>/dev/null; opkg install nfqws-keenetic-web 2>&1
+        ;;
+      4)
+        log "Installing HydraRoute Neo..."
+        # Check for legacy versions
+        if [ -f /opt/etc/init.d/S52hydra ] || opkg status hydraroute-classic 2>/dev/null | grep -q Status; then
+          warn "Обнаружена старая версия HydraRoute!"
+          if ask_yn "Обновить на Neo (конфиги будут перенесены)?" "y"; then
+            log "Migrating to Neo..."
+          fi
+        fi
+        if command -v curl >/dev/null 2>&1; then
+          curl -fsSL https://raw.githubusercontent.com/Ground-Zerro/HydraRoute/main/install.sh | sh
+        elif command -v wget >/dev/null 2>&1; then
+          wget -qO- https://raw.githubusercontent.com/Ground-Zerro/HydraRoute/main/install.sh | sh
+        fi
+        ;;
+      5)
+        # Check for HydraRoute conflict
+        if ls /opt/etc/init.d/*hydra* >/dev/null 2>&1; then
+          warn "⚠️  HydraRoute обнаружен! MagiTrickle может конфликтовать!"
+          warn "⚠️  HydraRoute detected! MagiTrickle may conflict!"
+          if ! ask_yn "Продолжить? / Continue?" "n"; then
+            continue
+          fi
+        fi
+        log "Installing MagiTrickle..."
+        if command -v curl >/dev/null 2>&1; then
+          curl -fsSL https://magitrickle.github.io/install.sh | sh
+        fi
+        ;;
+      6)
+        log "Installing AWG Manager..."
+        if command -v curl >/dev/null 2>&1; then
+          curl -fsSL https://raw.githubusercontent.com/hoaxisr/awg-manager/main/install.sh | sh
+        fi
+        ;;
+      0|"") ;;
+      *) warn "Unknown option: $c" ;;
+    esac
+  done
+}
+
+# ============================================================================
 # MAIN
 # ============================================================================
 main() {
@@ -690,15 +673,13 @@ main() {
     die "Not enough disk space: ${FREE_MB}MB free (need >= 10MB)"
   fi
 
-  install_deps
-  download_project
-  setup_token
-  setup_config
-  write_version
-  install_service
-  start_webui || warn "WebUI не запущен (см. выше)"
-
-  print_banner
+  # Check if running interactively (stdin is a tty)
+  if [ -t 0 ] 2>/dev/null; then
+    interactive_menu
+  else
+    # Non-interactive (piped) — full install
+    do_full_install
+  fi
 }
 
 main "$@"
