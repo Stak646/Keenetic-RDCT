@@ -2,7 +2,7 @@
 
 ## Установка
 ```shell
-curl -fsSL https://github.com/keenetic-debug/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Stak646/Keenetic-RDCT/main/scripts/install.sh | sh
 ```
 
 ## Базовый snapshot

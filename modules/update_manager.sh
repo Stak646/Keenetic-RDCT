@@ -30,7 +30,7 @@ update_check() {
   if command -v jq >/dev/null 2>&1 && [ -f "$prefix/config.json" ]; then
     manifest_url=$(jq -r '.updates.pinned_release_manifest_url // empty' "$prefix/config.json")
   fi
-  manifest_url="${manifest_url:-https://github.com/keenetic-debug/releases/latest/download/release-manifest.json}"
+  manifest_url="${manifest_url:-https://github.com/Stak646/Keenetic-RDCT/releases/latest/download/release-manifest.json}"
   
   local tmpdir=$(mktemp -d)
   local manifest="$tmpdir/release-manifest.json"

@@ -3,12 +3,12 @@
 ## Быстрая установка (онлайн)
 
 ```shell
-curl -fsSL https://github.com/keenetic-debug/releases/latest/download/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Stak646/Keenetic-RDCT/main/scripts/install.sh | sh
 ```
 
 Или через wget:
 ```shell
-wget -qO- https://github.com/keenetic-debug/releases/latest/download/install.sh | sh
+wget -qO- https://raw.githubusercontent.com/Stak646/Keenetic-RDCT/main/scripts/install.sh | sh
 ```
 
 ## Параметры

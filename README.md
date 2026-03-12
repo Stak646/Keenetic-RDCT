@@ -1,45 +1,73 @@
-# keenetic-debug
+# Keenetic-RDCT
 
-![CI](https://github.com/keenetic-debug/keenetic-debug/actions/workflows/ci.yml/badge.svg)
-![License](https://img.shields.io/badge/license-MIT-blue)
-![Version](https://img.shields.io/badge/version-0.1.0--alpha-orange)
+Диагностический инструмент для роутеров Keenetic с Entware.
 
-Diagnostic tool for Keenetic routers with Entware.
+## Установка
 
-## Quick Start
-
-```shell
-curl -fsSL https://github.com/Stak646/Keenetic-RDCT/install.sh | sh
-keenetic-debug start --mode light --perf lite
+```bash
+curl -fsSL https://raw.githubusercontent.com/Stak646/Keenetic-RDCT/main/scripts/install.sh | sh
 ```
 
-## Features
-- 21 data collectors (system, network, wifi, vpn, storage, apps, mirror)
-- WebUI with auth, roles, rate limiting
-- CLI with full RU/EN localization
-- Incremental snapshots (baseline/delta chain)
-- 10+ automated checks (port drift, config drift, WiFi/VPN regression, etc.)
-- Privacy modes: Light (mask secrets) → Extreme (preserve all)
-- Safe-by-default: localhost bind, bearer token, readonly mode
+Или через wget:
+```bash
+wget -qO- https://raw.githubusercontent.com/Stak646/Keenetic-RDCT/main/scripts/install.sh | sh
+```
 
-## Documentation
-- [Quick Start EN](docs/en/quickstart.md) | [RU](docs/ru/quickstart.md)
-- [Installation EN](docs/en/installation.md) | [RU](docs/ru/installation.md)
-- [WebUI Guide EN](docs/en/webui_guide.md) | [RU](docs/ru/webui_guide.md)
-- [CLI Reference EN](docs/en/cli_reference.md) | [RU](docs/ru/cli_reference.md)
-- [Security & Privacy EN](docs/en/security_privacy.md) | [RU](docs/ru/security_privacy.md)
-- [Configuration EN](docs/en/configuration.md) | [RU](docs/ru/configuration.md)
-- [Plugin Guide EN](docs/en/plugin_guide.md) | [RU](docs/ru/plugin_guide.md)
-- [Troubleshooting EN](docs/en/troubleshooting.md) | [RU](docs/ru/troubleshooting.md)
+После установки вы увидите:
+```
+  ✅  Keenetic-RDCT установлен!
 
-## Supported Architectures
-- mipsel (most Keenetic routers)
-- mips
-- aarch64 (newer models)
+  WebUI:  http://192.168.1.1:5000
+  Токен:  a1b2c3d4e5f6...
 
-## Security by Default
-- WebUI binds to 127.0.0.1 only
-- Bearer token authentication
-- dangerous_ops=false by default
-- Rate limiting on all API endpoints
-- Automatic redaction in Light/Medium modes
+  Откройте WebUI в браузере и используйте токен для входа.
+```
+
+## Требования
+
+- Keenetic с Entware
+- python3-light (`opkg install python3-light`) — для WebUI
+- Архитектуры: mipsel, mips, aarch64
+
+## Использование
+
+### WebUI
+Откройте `http://<IP роутера>:<порт>` и введите токен.
+
+### CLI
+```bash
+/opt/keenetic-debug/cli/keenetic-debug --help
+/opt/keenetic-debug/cli/keenetic-debug start --mode light --perf lite
+/opt/keenetic-debug/cli/keenetic-debug report list
+```
+
+### Управление сервисом
+```bash
+/opt/etc/init.d/S99keeneticrdct start
+/opt/etc/init.d/S99keeneticrdct stop
+/opt/etc/init.d/S99keeneticrdct status
+```
+
+## Безопасность
+
+- WebUI слушает на `0.0.0.0` (LAN) с Bearer Token аутентификацией
+- Токен в `var/.auth_token` (chmod 600)
+- dangerous_ops отключён по умолчанию
+- Режимы приватности: Light (маскирование) → Extreme (всё как есть)
+
+## Документация
+
+- [Quick Start RU](docs/ru/quickstart.md) | [EN](docs/en/quickstart.md)
+- [Установка](docs/ru/installation.md) | [Installation](docs/en/installation.md)
+- [WebUI](docs/ru/webui_guide.md) | [WebUI Guide](docs/en/webui_guide.md)
+- [CLI](docs/ru/cli_reference.md) | [CLI Reference](docs/en/cli_reference.md)
+- [Безопасность](docs/ru/security_privacy.md) | [Security](docs/en/security_privacy.md)
+- [Конфигурация](docs/ru/configuration.md) | [Configuration](docs/en/configuration.md)
+- [Устранение неполадок](docs/ru/troubleshooting.md) | [Troubleshooting](docs/en/troubleshooting.md)
+
+## Удаление
+
+```bash
+/opt/etc/init.d/S99keeneticrdct stop
+rm -rf /opt/keenetic-debug /opt/etc/init.d/S99keeneticrdct
+```
