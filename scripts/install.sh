@@ -15,6 +15,14 @@ RAW_URL="https://raw.githubusercontent.com/$REPO/$BRANCH"
 ARCHIVE_URL="https://github.com/$REPO/archive/refs/heads/${BRANCH}.tar.gz"
 PREFIX="/opt/keenetic-debug"
 PRODUCT="keenetic-debug"
+WEBUI_PORT=""
+AUTH_TOKEN=""
+LAN_IP=""
+ARCH=""
+HAS_ENTWARE=false
+HAS_PYTHON=false
+DL_CMD=""
+FREE_MB=0
 
 # --- Colors (if terminal supports) ---
 RED="\033[0;31m"; GREEN="\033[0;32m"; YELLOW="\033[1;33m"; CYAN="\033[0;36m"; BOLD="\033[1m"; NC="\033[0m"
@@ -65,17 +73,19 @@ detect_env() {
     die "Neither curl nor wget found. Install Entware first: opkg install curl"
   fi
 
-  # LAN IP
+  # LAN IP (BusyBox-compatible — no grep -P)
   LAN_IP=""
   if command -v ip >/dev/null 2>&1; then
-    LAN_IP=$(ip -4 addr show br0 2>/dev/null | grep -oP 'inet \K[\d.]+' || \
-             ip -4 addr show eth0 2>/dev/null | grep -oP 'inet \K[\d.]+' || \
-             ip -4 route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[\d.]+' || \
-             echo "")
+    LAN_IP=$(ip -4 addr show br0 2>/dev/null | awk '/inet / {split($2,a,"/"); print a[1]}' || true)
+    if [ -z "$LAN_IP" ]; then
+      LAN_IP=$(ip -4 addr show eth0 2>/dev/null | awk '/inet / {split($2,a,"/"); print a[1]}' || true)
+    fi
+    if [ -z "$LAN_IP" ]; then
+      LAN_IP=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '/src/ {for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' || true)
+    fi
   fi
-  # Fallback: hostname -I or /etc/hosts
   if [ -z "$LAN_IP" ]; then
-    LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "192.168.1.1")
+    LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "")
   fi
   [ -z "$LAN_IP" ] && LAN_IP="192.168.1.1"
 
@@ -186,14 +196,17 @@ setup_token() {
     return
   fi
 
-  # Generate random token
+  # Generate random token (BusyBox-compatible, no od -A)
   if command -v openssl >/dev/null 2>&1; then
     AUTH_TOKEN=$(openssl rand -hex 24)
+  elif [ -r /proc/sys/kernel/random/uuid ]; then
+    # Use kernel UUID — available on all Linux
+    AUTH_TOKEN=$(cat /proc/sys/kernel/random/uuid | tr -d '-')$(cat /proc/sys/kernel/random/uuid | tr -d '-' | cut -c1-16)
   elif [ -r /dev/urandom ]; then
-    AUTH_TOKEN=$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')
+    AUTH_TOKEN=$(hexdump -n 24 -e '24/1 "%02x"' /dev/urandom 2>/dev/null || \
+                 head -c 24 /dev/urandom | od -tx1 | head -3 | awk '{$1="";print}' | tr -d ' \n')
   else
-    AUTH_TOKEN=$(date +%s%N 2>/dev/null || date +%s)$(head -c 8 /proc/sys/kernel/random/uuid 2>/dev/null || echo "rand")
-    AUTH_TOKEN=$(echo "$AUTH_TOKEN" | md5sum 2>/dev/null | cut -c1-48 || echo "$AUTH_TOKEN")
+    AUTH_TOKEN="$(date +%s)$(cat /proc/uptime 2>/dev/null | tr -d '. ')"
   fi
 
   echo "$AUTH_TOKEN" > "$token_file"
@@ -243,22 +256,27 @@ CFGEOF
 # STEP 7: Find free port
 # ============================================================================
 find_port() {
-  local start=5000 end=5099 port=$start
+  local start=5000
+  local end=5099
+  local port="$start"
 
   while [ "$port" -le "$end" ]; do
     # Check if port is in use
     if command -v ss >/dev/null 2>&1; then
-      ss -tln 2>/dev/null | grep -q ":${port} " || { echo "$port"; return; }
+      if ! ss -tln 2>/dev/null | grep -q ":${port} "; then
+        echo "$port"; return 0
+      fi
     elif command -v netstat >/dev/null 2>&1; then
-      netstat -tln 2>/dev/null | grep -q ":${port} " || { echo "$port"; return; }
+      if ! netstat -tln 2>/dev/null | grep -q ":${port} "; then
+        echo "$port"; return 0
+      fi
     else
-      # No tool to check — just use start port
-      echo "$port"; return
+      echo "$port"; return 0
     fi
     port=$((port + 1))
   done
 
-  echo "$start"  # fallback
+  echo "$start"
 }
 
 # ============================================================================
@@ -273,9 +291,12 @@ start_webui() {
 
   # Kill old instance
   if [ -f "$PREFIX/run/webui.pid" ]; then
-    local old_pid=$(cat "$PREFIX/run/webui.pid")
-    kill "$old_pid" 2>/dev/null
-    sleep 1
+    local old_pid
+    old_pid=$(cat "$PREFIX/run/webui.pid" 2>/dev/null || echo "")
+    if [ -n "$old_pid" ]; then
+      kill "$old_pid" 2>/dev/null || true
+      sleep 1
+    fi
   fi
 
   WEBUI_PORT=$(find_port)
@@ -519,13 +540,24 @@ BEOF
 # PRINT RESULT
 # ============================================================================
 print_banner() {
+  local webui_ok=false
+  local webui_pid=""
+
+  if [ -f "$PREFIX/run/webui.pid" ]; then
+    webui_pid=$(cat "$PREFIX/run/webui.pid" 2>/dev/null || echo "")
+  fi
+
+  if [ -n "${WEBUI_PORT:-}" ] && [ -n "$webui_pid" ] && kill -0 "$webui_pid" 2>/dev/null; then
+    webui_ok=true
+  fi
+
   echo ""
   line
   printf "${BOLD}  ✅  Keenetic-RDCT установлен!${NC}\n"
   line
   echo ""
 
-  if [ -n "$WEBUI_PORT" ] && [ -f "$PREFIX/run/webui.pid" ] && kill -0 $(cat "$PREFIX/run/webui.pid") 2>/dev/null; then
+  if [ "$webui_ok" = true ]; then
     printf "  ${BOLD}WebUI:${NC}  ${CYAN}http://%s:%s${NC}\n" "$LAN_IP" "$WEBUI_PORT"
   else
     printf "  ${YELLOW}WebUI:  не запущен (нужен python3)${NC}\n"
@@ -534,7 +566,11 @@ print_banner() {
   printf "  ${BOLD}Токен:${NC}  ${GREEN}%s${NC}\n" "$AUTH_TOKEN"
   echo ""
   printf "  Откройте WebUI в браузере и используйте токен для входа.\n"
-  printf "  Или добавьте в URL: ${CYAN}http://%s:%s/?token=%s${NC}\n" "$LAN_IP" "$WEBUI_PORT" "$AUTH_TOKEN"
+
+  if [ "$webui_ok" = true ]; then
+    printf "  Или добавьте в URL: ${CYAN}http://%s:%s/?token=%s${NC}\n" "$LAN_IP" "$WEBUI_PORT" "$AUTH_TOKEN"
+  fi
+
   echo ""
   line
   printf "  Prefix:    %s\n" "$PREFIX"
@@ -572,7 +608,7 @@ main() {
   setup_config
   write_version
   install_service
-  start_webui
+  start_webui || warn "WebUI не запущен (см. выше)"
 
   print_banner
 }
