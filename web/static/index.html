@@ -5,272 +5,395 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Keenetic-RDCT</title>
 <style>
-  :root { --bg: #0f1117; --card: #1a1d28; --border: #2a2d3a; --accent: #3b82f6; --green: #22c55e; --yellow: #eab308; --red: #ef4444; --text: #e2e8f0; --muted: #94a3b8; }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family: -apple-system, system-ui, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-
-  .header { background: var(--card); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
-  .header h1 { font-size: 16px; font-weight: 600; }
-  .header h1 span { color: var(--accent); }
-  .header-right { display: flex; gap: 10px; align-items: center; }
-  .lang-btn { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
-  .lang-btn.active { color: var(--accent); border-color: var(--accent); }
-  .status-badge { font-size: 11px; padding: 3px 8px; border-radius: 10px; }
-  .status-badge.ok { background: rgba(34,197,94,.15); color: var(--green); }
-  .status-badge.err { background: rgba(239,68,68,.15); color: var(--red); }
-
-  .auth-screen { display: flex; justify-content: center; align-items: center; height: 80vh; }
-  .auth-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 32px; width: 360px; text-align: center; }
-  .auth-box h2 { margin-bottom: 8px; font-size: 18px; }
-  .auth-box p { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
-  .auth-box input { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14px; margin-bottom: 12px; }
-  .auth-box button { width: 100%; padding: 10px; border: none; border-radius: 8px; background: var(--accent); color: #fff; font-size: 14px; cursor: pointer; font-weight: 500; }
-  .auth-box button:hover { opacity: 0.9; }
-  .auth-error { color: var(--red); font-size: 12px; margin-top: 8px; display: none; }
-
-  .container { max-width: 960px; margin: 0 auto; padding: 20px; }
-  .nav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
-  .nav a { padding: 6px 14px; border-radius: 6px; text-decoration: none; color: var(--muted); font-size: 13px; cursor: pointer; transition: all .2s; border: 1px solid transparent; }
-  .nav a:hover { color: var(--text); background: var(--card); }
-  .nav a.active { color: var(--accent); background: rgba(59,130,246,.1); border-color: rgba(59,130,246,.3); }
-
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 20px; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
-  .card h3 { font-size: 13px; color: var(--muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .card .value { font-size: 24px; font-weight: 700; }
-  .card .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
-
-  .section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
-  .section h2 { font-size: 15px; margin-bottom: 12px; }
-  .section pre { background: var(--bg); padding: 12px; border-radius: 6px; font-size: 12px; overflow-x: auto; max-height: 400px; overflow-y: auto; color: var(--muted); }
-  .section table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .section th { text-align: left; padding: 8px; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 500; }
-  .section td { padding: 8px; border-bottom: 1px solid var(--border); }
-
-  .btn { padding: 8px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-warn { background: var(--yellow); color: #000; }
-  .btn-danger { background: var(--red); color: #fff; }
-  .actions { display: flex; gap: 8px; margin-bottom: 16px; }
+:root{--bg:#0c0e14;--surface:#13151f;--card:#1a1d2a;--border:#252838;--accent:#3b82f6;--accent2:#8b5cf6;--green:#22c55e;--yellow:#eab308;--red:#ef4444;--orange:#f97316;--text:#e2e8f0;--muted:#64748b;--dim:#475569;--radius:8px;--shadow:0 2px 8px rgba(0,0,0,.3)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,system-ui,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+/* Layout */
+.layout{display:flex;min-height:100vh}
+.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);padding:16px 0;flex-shrink:0;position:fixed;height:100vh;overflow-y:auto}
+.sidebar-brand{padding:12px 20px 20px;font-size:15px;font-weight:700;border-bottom:1px solid var(--border);margin-bottom:8px}
+.sidebar-brand span{color:var(--accent)}
+.main{margin-left:220px;flex:1;padding:24px;max-width:1100px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 20px;color:var(--muted);cursor:pointer;font-size:13px;transition:.15s;border-left:3px solid transparent}
+.nav-item:hover{color:var(--text);background:rgba(255,255,255,.03)}
+.nav-item.active{color:var(--accent);background:rgba(59,130,246,.08);border-left-color:var(--accent)}
+.nav-item svg{width:16px;height:16px;flex-shrink:0}
+.nav-sep{height:1px;background:var(--border);margin:8px 16px}
+.sidebar-footer{position:absolute;bottom:0;width:100%;padding:12px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--dim)}
+.sidebar-footer select{background:var(--card);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:4px;font-size:11px;width:100%;margin-top:6px}
+/* Cards */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-bottom:20px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.card h4{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
+.card .val{font-size:28px;font-weight:700;line-height:1.1}
+.card .sub{font-size:12px;color:var(--dim);margin-top:4px}
+.stat-ok{color:var(--green)}.stat-warn{color:var(--yellow)}.stat-err{color:var(--red)}.stat-accent{color:var(--accent)}
+/* Sections */
+.section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:16px}
+.section h2{font-size:15px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.section h2 .badge{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:500}
+.badge-ok{background:rgba(34,197,94,.15);color:var(--green)}
+.badge-warn{background:rgba(234,179,8,.15);color:var(--yellow)}
+.badge-crit{background:rgba(239,68,68,.15);color:var(--red)}
+.badge-info{background:rgba(59,130,246,.15);color:var(--accent)}
+/* Table */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 10px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:500;font-size:12px}
+td{padding:8px 10px;border-bottom:1px solid var(--border)}
+tr:hover td{background:rgba(255,255,255,.02)}
+/* Buttons */
+.btn{padding:7px 16px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{opacity:.85}
+.btn-success{background:var(--green);color:#fff}
+.btn-danger{background:var(--red);color:#fff}
+.btn-warn{background:var(--yellow);color:#000}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}.btn-ghost:hover{border-color:var(--accent)}
+.btn-sm{padding:4px 10px;font-size:12px}
+.actions{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+/* Tags */
+.tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:500}
+.tag-ok{background:rgba(34,197,94,.12);color:var(--green)}
+.tag-skip{background:rgba(100,116,139,.15);color:var(--muted)}
+.tag-fail{background:rgba(239,68,68,.12);color:var(--red)}
+.tag-timeout{background:rgba(249,115,22,.12);color:var(--orange)}
+.tag-warn{background:rgba(234,179,8,.12);color:var(--yellow)}
+/* Pre/Code */
+pre{background:var(--bg);padding:12px;border-radius:6px;font-size:12px;overflow-x:auto;max-height:500px;overflow-y:auto;color:var(--muted);border:1px solid var(--border)}
+code{background:var(--bg);padding:1px 5px;border-radius:3px;font-size:12px}
+/* Search */
+.search{width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;margin-bottom:12px}
+.search:focus{outline:none;border-color:var(--accent)}
+/* Filters */
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.filter-btn{padding:4px 10px;border:1px solid var(--border);border-radius:14px;font-size:11px;cursor:pointer;color:var(--muted);background:transparent;transition:.15s}
+.filter-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(59,130,246,.08)}
+/* Loader */
+.loader{color:var(--dim);font-style:italic;padding:20px}
+/* Auth */
+.auth-wrap{display:flex;justify-content:center;align-items:center;height:100vh;background:var(--bg)}
+.auth-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:36px;width:380px;text-align:center}
+.auth-box h2{margin-bottom:6px;font-size:20px}.auth-box p{color:var(--muted);font-size:13px;margin-bottom:20px}
+.auth-box input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:14px;margin-bottom:12px}
+.auth-box .btn{width:100%;justify-content:center;padding:10px}
+.auth-err{color:var(--red);font-size:12px;margin-top:6px;display:none}
+/* Progress bar */
+.progress-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin:8px 0}
+.progress-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .5s}
+/* Severity icons */
+.sev-crit::before{content:"🔴 "}.sev-warn::before{content:"🟡 "}.sev-info::before{content:"🔵 "}
+/* Responsive */
+@media(max-width:768px){.sidebar{display:none}.main{margin-left:0}}
+/* Page title */
+.page-title{font-size:20px;font-weight:700;margin-bottom:18px;display:flex;align-items:center;gap:10px}
 </style>
 </head>
 <body>
 
-<!-- AUTH SCREEN -->
-<div id="authScreen" class="auth-screen">
-  <div class="auth-box">
-    <h2>🔒 Keenetic-RDCT</h2>
-    <p>Введите токен авторизации</p>
-    <input type="text" id="tokenInput" placeholder="Вставьте токен из var/.auth_token" autofocus>
-    <button onclick="doAuth()">Войти</button>
-    <div class="auth-error" id="authError">Неверный токен</div>
-    <p style="margin-top:16px;font-size:11px;color:var(--muted)">Токен указан при установке</p>
-  </div>
+<!-- AUTH -->
+<div id="auth" class="auth-wrap">
+<div class="auth-box">
+<h2>🔒 Keenetic-RDCT</h2>
+<p id="authSubtext">Введите токен авторизации</p>
+<input type="text" id="tokenIn" placeholder="Токен из var/.auth_token" autofocus>
+<button class="btn btn-primary" onclick="doAuth()">Войти</button>
+<div class="auth-err" id="authErr"></div>
+<p style="margin-top:14px;font-size:11px;color:var(--dim)" id="authHint">Токен выводится при установке</p>
+</div></div>
+
+<!-- APP -->
+<div id="app" class="layout" style="display:none">
+<aside class="sidebar">
+<div class="sidebar-brand">Keenetic-<span>RDCT</span></div>
+<div class="nav-item active" onclick="go('dash')" data-p="dash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span data-t="nav.dash">Панель</span></div>
+<div class="nav-item" onclick="go('preflight')" data-p="preflight"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg><span data-t="nav.preflight">Preflight</span></div>
+<div class="nav-item" onclick="go('progress')" data-p="progress"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span data-t="nav.progress">Прогресс</span></div>
+<div class="nav-sep"></div>
+<div class="nav-item" onclick="go('reports')" data-p="reports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span data-t="nav.reports">Отчёты</span></div>
+<div class="nav-item" onclick="go('inventory')" data-p="inventory"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg><span data-t="nav.inventory">Инвентаризация</span></div>
+<div class="nav-item" onclick="go('checks')" data-p="checks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span data-t="nav.checks">Проверки</span></div>
+<div class="nav-item" onclick="go('chain')" data-p="chain"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg><span data-t="nav.chain">Цепочка</span></div>
+<div class="nav-sep"></div>
+<div class="nav-item" onclick="go('device')" data-p="device"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg><span data-t="nav.device">Устройство</span></div>
+<div class="nav-item" onclick="go('apps')" data-p="apps"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg><span data-t="nav.apps">Приложения</span></div>
+<div class="nav-item" onclick="go('settings')" data-p="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span data-t="nav.settings">Настройки</span></div>
+<div class="sidebar-footer">
+<div id="verLabel">v0.1.0</div>
+<select id="langSel" onchange="setLang(this.value)"><option value="ru">🇷🇺 Русский</option><option value="en">🇬🇧 English</option></select>
 </div>
+</aside>
 
-<!-- MAIN APP (hidden until auth) -->
-<div id="mainApp" style="display:none">
-  <div class="header">
-    <h1>Keenetic-<span>RDCT</span></h1>
-    <div class="header-right">
-      <span class="status-badge" id="statusBadge">...</span>
-      <button class="lang-btn" onclick="setLang('ru')">RU</button>
-      <button class="lang-btn" onclick="setLang('en')">EN</button>
-    </div>
-  </div>
-
-  <div class="container">
-    <nav class="nav" id="nav">
-      <a onclick="showPage('dashboard')" class="active" data-page="dashboard">Панель</a>
-      <a onclick="showPage('reports')" data-page="reports">Отчёты</a>
-      <a onclick="showPage('config')" data-page="config">Конфигурация</a>
-      <a onclick="showPage('device')" data-page="device">Устройство</a>
-    </nav>
-
-    <!-- DASHBOARD -->
-    <div id="page-dashboard">
-      <div class="grid">
-        <div class="card">
-          <h3>Статус</h3>
-          <div class="value" id="dState">—</div>
-          <div class="sub" id="dVersion"></div>
-        </div>
-        <div class="card">
-          <h3>Отчёты</h3>
-          <div class="value" id="dReports">—</div>
-          <div class="sub">snapshot'ов</div>
-        </div>
-        <div class="card">
-          <h3>WebUI</h3>
-          <div class="value" id="dPort">—</div>
-          <div class="sub" id="dBind"></div>
-        </div>
-      </div>
-      <div class="actions">
-        <button class="btn btn-primary" onclick="alert('CLI: keenetic-debug start')">▶ Запустить сбор</button>
-      </div>
-    </div>
-
-    <!-- REPORTS -->
-    <div id="page-reports" style="display:none">
-      <div class="section">
-        <h2>Отчёты</h2>
-        <div id="reportsList">Загрузка...</div>
-      </div>
-    </div>
-
-    <!-- CONFIG -->
-    <div id="page-config" style="display:none">
-      <div class="section">
-        <h2>Конфигурация</h2>
-        <pre id="configPre">Загрузка...</pre>
-      </div>
-    </div>
-
-    <!-- DEVICE -->
-    <div id="page-device" style="display:none">
-      <div class="section">
-        <h2>Устройство</h2>
-        <pre id="devicePre">Загрузка...</pre>
-      </div>
-    </div>
-  </div>
+<div class="main">
+<!-- DASHBOARD -->
+<div id="p-dash"><div class="page-title" data-t="nav.dash">Панель управления</div>
+<div class="grid">
+<div class="card"><h4 data-t="d.status">Статус</h4><div class="val stat-ok" id="dSt">—</div><div class="sub" id="dVer"></div></div>
+<div class="card"><h4 data-t="d.reports">Отчёты</h4><div class="val stat-accent" id="dRep">—</div></div>
+<div class="card"><h4 data-t="d.mode">Режим</h4><div class="val" id="dMode">—</div><div class="sub" id="dPerf"></div></div>
+<div class="card"><h4>WebUI</h4><div class="val stat-accent" id="dPort">—</div><div class="sub" id="dBind"></div></div>
 </div>
+<div class="actions">
+<button class="btn btn-primary" onclick="apiPost('/api/start')" data-t="btn.start">▶ Запустить сбор</button>
+<button class="btn btn-danger" onclick="apiPost('/api/stop')" data-t="btn.stop">⏹ Остановить</button>
+<button class="btn btn-ghost" onclick="go('preflight')" data-t="btn.preflight">Preflight</button>
+</div>
+<div class="section"><h2 data-t="d.quick">Быстрые действия</h2>
+<p style="color:var(--muted);font-size:13px;line-height:1.7">
+<b>CLI:</b><br>
+<code>/opt/keenetic-debug/cli/keenetic-debug start --mode light --perf lite</code><br>
+<code>/opt/keenetic-debug/cli/keenetic-debug report list</code><br>
+<code>/opt/keenetic-debug/cli/keenetic-debug checks show</code>
+</p></div></div>
+
+<!-- PREFLIGHT -->
+<div id="p-preflight" style="display:none"><div class="page-title" data-t="nav.preflight">Preflight</div>
+<div class="section"><h2 data-t="pf.env">Окружение</h2><div id="pfEnv" class="loader">Загрузка...</div></div>
+<div class="section"><h2 data-t="pf.warn">Предупреждения</h2><div id="pfWarn"></div></div>
+<div class="section"><h2 data-t="pf.est">Оценка затрат</h2><div id="pfEst"></div></div>
+<div class="section"><h2 data-t="pf.plan">План сборщиков</h2>
+<p style="color:var(--muted);font-size:12px;margin-bottom:10px" data-t="pf.planHint">Почему каждый collector включён или выключен</p>
+<div id="pfPlan"></div></div></div>
+
+<!-- PROGRESS -->
+<div id="p-progress" style="display:none"><div class="page-title" data-t="nav.progress">Прогресс</div>
+<div class="section"><h2 data-t="pr.current">Текущий сбор</h2>
+<div id="prState" class="loader">Нет активного сбора</div>
+<div class="progress-bar"><div class="progress-fill" id="prBar" style="width:0%"></div></div>
+</div>
+<div class="section"><h2 data-t="pr.queue">Очередь</h2><div id="prQueue"></div></div>
+<div class="section"><h2 data-t="pr.governor">Governor (ресурсы)</h2><div id="prGov"></div></div></div>
+
+<!-- REPORTS -->
+<div id="p-reports" style="display:none"><div class="page-title" data-t="nav.reports">Отчёты</div>
+<div id="repList" class="loader">Загрузка...</div></div>
+
+<!-- INVENTORY -->
+<div id="p-inventory" style="display:none"><div class="page-title" data-t="nav.inventory">Инвентаризация</div>
+<input class="search" id="invSearch" placeholder="Поиск по порту, процессу, пакету..." oninput="filterInv()">
+<div class="section"><div id="invTable" class="loader">Загрузка...</div></div></div>
+
+<!-- CHECKS -->
+<div id="p-checks" style="display:none"><div class="page-title" data-t="nav.checks">Проверки и аномалии</div>
+<div class="filters" id="checkFilters">
+<span class="filter-btn active" onclick="filterChecks('all')">Все</span>
+<span class="filter-btn" onclick="filterChecks('CRIT')">🔴 Critical</span>
+<span class="filter-btn" onclick="filterChecks('WARN')">🟡 Warning</span>
+<span class="filter-btn" onclick="filterChecks('INFO')">🔵 Info</span>
+</div>
+<div class="grid" id="checkSummary"></div>
+<div class="section"><div id="checkList"></div></div></div>
+
+<!-- CHAIN -->
+<div id="p-chain" style="display:none"><div class="page-title" data-t="nav.chain">Цепочка baseline / delta</div>
+<div class="section"><h2 data-t="ch.view">Цепочка</h2><div id="chainView" class="loader">Загрузка...</div></div>
+<div class="actions">
+<button class="btn btn-warn btn-sm" onclick="apiPost('/api/chain/rebase')" data-t="btn.rebase">Rebase</button>
+<button class="btn btn-ghost btn-sm" onclick="apiPost('/api/chain/compact')" data-t="btn.compact">Compact</button>
+</div></div>
+
+<!-- DEVICE -->
+<div id="p-device" style="display:none"><div class="page-title" data-t="nav.device">Устройство</div>
+<div class="grid" id="devGrid"></div>
+<div class="section"><h2 data-t="dev.raw">Системные данные</h2><pre id="devRaw">Загрузка...</pre></div></div>
+
+<!-- APPS -->
+<div id="p-apps" style="display:none"><div class="page-title" data-t="nav.apps">Приложения и сервисы</div>
+<div class="section"><h2 data-t="app.services">Сервисы Entware</h2><div id="appList" class="loader">Загрузка...</div></div></div>
+
+<!-- SETTINGS -->
+<div id="p-settings" style="display:none"><div class="page-title" data-t="nav.settings">Настройки</div>
+<div class="section"><h2 data-t="set.config">Конфигурация</h2><pre id="setCfg">Загрузка...</pre></div>
+<div class="section"><h2 data-t="set.security">Безопасность</h2>
+<p style="color:var(--muted);font-size:13px;line-height:1.8">
+<span data-t="set.secInfo">WebUI доступен только в LAN. Используется Bearer Token аутентификация.<br>
+Роли: <b>admin</b> (полный доступ), <b>readonly</b> (только просмотр).<br>
+Опасные операции (restart/restore/delete) требуют <code>dangerous_ops=true</code> в конфиге.<br>
+Токен хранится в <code>var/.auth_token</code> (chmod 600).</span>
+</p></div></div>
+
+</div><!-- /main -->
+</div><!-- /app -->
 
 <script>
-let TOKEN = localStorage.getItem('rdct_token') || '';
-let LANG = localStorage.getItem('rdct_lang') || 'ru';
+/* ========== GLOBALS ========== */
+let T='',LANG=localStorage.getItem('rdct_l')||'ru',I18N={},CUR_PAGE='dash';
+const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
 
-// Check token from URL
-const params = new URLSearchParams(window.location.search);
-if (params.get('token')) {
-  TOKEN = params.get('token');
-  localStorage.setItem('rdct_token', TOKEN);
-  window.history.replaceState({}, '', '/');
-}
+/* ========== I18N ========== */
+const STRINGS={
+ru:{
+'nav.dash':'Панель управления','nav.preflight':'Preflight','nav.progress':'Прогресс','nav.reports':'Отчёты','nav.inventory':'Инвентаризация','nav.checks':'Проверки','nav.chain':'Цепочка','nav.device':'Устройство','nav.apps':'Приложения','nav.settings':'Настройки',
+'d.status':'Статус','d.reports':'Отчёты','d.mode':'Режим','d.quick':'Быстрые действия',
+'btn.start':'▶ Запустить сбор','btn.stop':'⏹ Остановить','btn.preflight':'Preflight','btn.download':'Скачать','btn.delete':'Удалить','btn.rebase':'Rebase','btn.compact':'Compact',
+'pf.env':'Окружение','pf.warn':'Предупреждения','pf.est':'Оценка затрат','pf.plan':'План сборщиков','pf.planHint':'Почему каждый collector включён или выключен',
+'pr.current':'Текущий сбор','pr.queue':'Очередь','pr.governor':'Governor (ресурсы)',
+'ch.view':'Цепочка','dev.raw':'Системные данные','app.services':'Сервисы Entware',
+'set.config':'Конфигурация','set.security':'Безопасность',
+'set.secInfo':'WebUI доступен только в LAN. Bearer Token аутентификация.<br>Роли: <b>admin</b> / <b>readonly</b>.<br>Опасные операции требуют <code>dangerous_ops=true</code>.',
+'authSub':'Введите токен авторизации','authHint':'Токен выводится при установке','authErr':'Неверный токен',
+'rep.id':'ID отчёта','rep.size':'Размер','rep.actions':'Действия','rep.none':'Нет отчётов','rep.manifest':'Манифест','rep.redaction':'Редактирование','rep.inventory':'Инвентаризация','rep.checks':'Проверки',
+'inv.port':'Порт','inv.proto':'Протокол','inv.process':'Процесс','inv.pid':'PID','inv.package':'Пакет','inv.bind':'Привязка','inv.warn':'Предупреждения',
+'ck.total':'Всего','ck.crit':'Критических','ck.warn':'Предупреждений','ck.info':'Информационных',
+},
+en:{
+'nav.dash':'Dashboard','nav.preflight':'Preflight','nav.progress':'Progress','nav.reports':'Reports','nav.inventory':'Inventory','nav.checks':'Checks','nav.chain':'Chain','nav.device':'Device','nav.apps':'Apps','nav.settings':'Settings',
+'d.status':'Status','d.reports':'Reports','d.mode':'Mode','d.quick':'Quick Actions',
+'btn.start':'▶ Start Collection','btn.stop':'⏹ Stop','btn.preflight':'Preflight','btn.download':'Download','btn.delete':'Delete','btn.rebase':'Rebase','btn.compact':'Compact',
+'pf.env':'Environment','pf.warn':'Warnings','pf.est':'Cost Estimates','pf.plan':'Collector Plan','pf.planHint':'Why each collector is included or skipped',
+'pr.current':'Current Run','pr.queue':'Queue','pr.governor':'Governor (Resources)',
+'ch.view':'Chain View','dev.raw':'System Data','app.services':'Entware Services',
+'set.config':'Configuration','set.security':'Security',
+'set.secInfo':'WebUI accessible on LAN only. Bearer Token authentication.<br>Roles: <b>admin</b> / <b>readonly</b>.<br>Dangerous operations require <code>dangerous_ops=true</code>.',
+'authSub':'Enter authorization token','authHint':'Token shown during installation','authErr':'Invalid token',
+'rep.id':'Report ID','rep.size':'Size','rep.actions':'Actions','rep.none':'No reports','rep.manifest':'Manifest','rep.redaction':'Redaction','rep.inventory':'Inventory','rep.checks':'Checks',
+'inv.port':'Port','inv.proto':'Proto','inv.process':'Process','inv.pid':'PID','inv.package':'Package','inv.bind':'Bind','inv.warn':'Warnings',
+'ck.total':'Total','ck.crit':'Critical','ck.warn':'Warnings','ck.info':'Info',
+}};
+function t(k){return(STRINGS[LANG]||STRINGS.ru)[k]||k}
+function applyI18n(){$$('[data-t]').forEach(e=>{const k=e.dataset.t,v=t(k);if(v)e.innerHTML=v});$('#authSubtext').textContent=t('authSub');$('#authHint').textContent=t('authHint')}
+function setLang(l){LANG=l;localStorage.setItem('rdct_l',l);$('#langSel').value=l;applyI18n()}
 
-// Auth
-async function doAuth() {
-  const input = document.getElementById('tokenInput').value.trim();
-  if (!input) return;
-  TOKEN = input;
-  try {
-    const r = await fetch('/api/progress', { headers: { 'Authorization': 'Bearer ' + TOKEN } });
-    if (r.status === 401) {
-      document.getElementById('authError').style.display = 'block';
-      return;
-    }
-    localStorage.setItem('rdct_token', TOKEN);
-    showApp();
-  } catch(e) {
-    document.getElementById('authError').textContent = 'Ошибка соединения';
-    document.getElementById('authError').style.display = 'block';
-  }
-}
+/* ========== AUTH ========== */
+function doAuth(){const v=$('#tokenIn').value.trim();if(!v)return;T=v;
+api('/api/progress').then(()=>{localStorage.setItem('rdct_t',T);$('#auth').style.display='none';$('#app').style.display='flex';initApp()})
+.catch(()=>{$('#authErr').textContent=t('authErr');$('#authErr').style.display='block'})}
+$('#tokenIn').onkeydown=e=>{if(e.key==='Enter')doAuth()};
 
-document.getElementById('tokenInput').addEventListener('keydown', e => { if(e.key==='Enter') doAuth(); });
+/* ========== API ========== */
+async function api(u){const r=await fetch(u,{headers:{'Authorization':'Bearer '+T}});if(r.status===401)throw'auth';return r.json()}
+async function apiPost(u,b){try{const r=await fetch(u,{method:'POST',headers:{'Authorization':'Bearer '+T,'Content-Type':'application/json'},body:b?JSON.stringify(b):'{}'});return r.json()}catch(e){return{error:e.message}}}
 
-function showApp() {
-  document.getElementById('authScreen').style.display = 'none';
-  document.getElementById('mainApp').style.display = 'block';
-  loadDashboard();
-}
+/* ========== NAVIGATION ========== */
+function go(p){CUR_PAGE=p;$$('[id^="p-"]').forEach(e=>e.style.display='none');$('#p-'+p).style.display='block';
+$$('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.p===p));
+loaders[p]&&loaders[p]()}
 
-// Check if already authed
-if (TOKEN) {
-  fetch('/api/progress', { headers: { 'Authorization': 'Bearer ' + TOKEN } })
-    .then(r => { if (r.ok) showApp(); })
-    .catch(() => {});
-}
+/* ========== PAGE LOADERS ========== */
+const loaders={
+dash:loadDash,preflight:loadPreflight,progress:loadProgress,reports:loadReports,
+inventory:loadInventory,checks:loadChecks,chain:loadChain,device:loadDevice,apps:loadApps,settings:loadSettings
+};
 
-// API helper
-async function api(path) {
-  const r = await fetch(path, { headers: { 'Authorization': 'Bearer ' + TOKEN } });
-  if (!r.ok) throw new Error(r.status);
-  return r.json();
-}
+async function loadDash(){
+try{const h=await fetch('/health').then(r=>r.json());
+$('#dSt').textContent='✅ Online';$('#dSt').className='val stat-ok';
+$('#dVer').textContent='v'+h.version;$('#dPort').textContent=':'+h.port;$('#dBind').textContent=location.hostname;
+$('#verLabel').textContent='v'+h.version}catch{$('#dSt').textContent='❌ Offline';$('#dSt').className='val stat-err'}
+try{const r=await api('/api/reports');$('#dRep').textContent=r.reports?r.reports.length:0}catch{}
+try{const c=await api('/api/config');$('#dMode').textContent=(c.research_mode||'—').toUpperCase();$('#dPerf').textContent=c.performance_mode||''}catch{}}
 
-// Pages
-function showPage(name) {
-  document.querySelectorAll('[id^="page-"]').forEach(el => el.style.display = 'none');
-  document.getElementById('page-' + name).style.display = 'block';
-  document.querySelectorAll('.nav a').forEach(a => a.classList.toggle('active', a.dataset.page === name));
-  if (name === 'reports') loadReports();
-  if (name === 'config') loadConfig();
-  if (name === 'device') loadDevice();
-}
+async function loadPreflight(){
+$('#pfEnv').innerHTML='<div class="loader">Загрузка...</div>';
+try{const d=await api('/api/device');
+$('#pfEnv').innerHTML=`<table><tr><td><b>Arch</b></td><td>${d.arch||'?'}</td></tr><tr><td><b>Kernel</b></td><td>${d.kernel||'?'}</td></tr><tr><td><b>Hostname</b></td><td>${d.hostname||'?'}</td></tr></table>`}catch{$('#pfEnv').textContent='—'}
+// Warnings and plan would come from /api/preflight when implemented
+$('#pfWarn').innerHTML='<p style="color:var(--muted)">Запустите preflight через CLI для получения данных</p>';
+$('#pfEst').innerHTML='<p style="color:var(--muted)">Оценка будет доступна после preflight</p>';
+$('#pfPlan').innerHTML='<p style="color:var(--muted)">План формируется при запуске preflight</p>'}
 
-// Dashboard
-async function loadDashboard() {
-  try {
-    const h = await fetch('/health').then(r => r.json());
-    document.getElementById('dState').textContent = '✅ Online';
-    document.getElementById('dVersion').textContent = 'v' + h.version;
-    document.getElementById('dPort').textContent = ':' + h.port;
-    document.getElementById('dBind').textContent = location.hostname;
-    document.getElementById('statusBadge').textContent = 'Online';
-    document.getElementById('statusBadge').className = 'status-badge ok';
-  } catch(e) {
-    document.getElementById('dState').textContent = '❌ Offline';
-    document.getElementById('statusBadge').textContent = 'Offline';
-    document.getElementById('statusBadge').className = 'status-badge err';
-  }
-  try {
-    const rep = await api('/api/reports');
-    document.getElementById('dReports').textContent = rep.reports ? rep.reports.length : 0;
-  } catch(e) {}
-}
+async function loadProgress(){
+try{const s=await api('/api/progress');
+if(s.state&&s.state!=='idle'){
+$('#prState').innerHTML=`<b>${s.state}</b> — Report: <code>${s.report_id||'—'}</code>`;
+$('#prBar').style.width=(s.overall_pct||0)+'%';
+$('#prQueue').innerHTML=s.current_collector?`Текущий: <b>${s.current_collector}</b>`:'-';
+$('#prGov').innerHTML=s.governor?`<table><tr><td>Workers</td><td>${s.governor.workers_active||'?'}</td></tr><tr><td>CPU %</td><td>${s.governor.cpu_pct||'?'}</td></tr><tr><td>RAM %</td><td>${s.governor.ram_used_pct||'?'}</td></tr></table>`:'-'
+}else{$('#prState').innerHTML='<span style="color:var(--muted)">Нет активного сбора</span>';$('#prBar').style.width='0%';$('#prQueue').innerHTML='-';$('#prGov').innerHTML='-'}}catch{}}
 
-// Reports
-async function loadReports() {
-  try {
-    const data = await api('/api/reports');
-    if (!data.reports || data.reports.length === 0) {
-      document.getElementById('reportsList').innerHTML = '<p style="color:var(--muted)">Нет отчётов. Запустите: <code>keenetic-debug start</code></p>';
-      return;
-    }
-    let html = '<table><tr><th>Report ID</th><th>Размер</th></tr>';
-    for (const r of data.reports) {
-      const size = r.size_bytes ? (r.size_bytes / 1024).toFixed(0) + ' KB' : '—';
-      html += '<tr><td>' + r.id + '</td><td>' + size + '</td></tr>';
-    }
-    html += '</table>';
-    document.getElementById('reportsList').innerHTML = html;
-  } catch(e) {
-    document.getElementById('reportsList').textContent = 'Ошибка загрузки';
-  }
-}
+async function loadReports(){
+try{const d=await api('/api/reports');
+if(!d.reports||!d.reports.length){$('#repList').innerHTML=`<div class="section"><p style="color:var(--muted)">${t('rep.none')}</p></div>`;return}
+let h='';for(const r of d.reports){
+const sz=r.size_bytes?(r.size_bytes/1024).toFixed(0)+' KB':'—';
+h+=`<div class="section"><h2>${r.id} <span class="badge badge-ok">${sz}</span></h2>
+<div class="actions">
+<button class="btn btn-ghost btn-sm" onclick="viewSub('${r.id}','manifest')">${t('rep.manifest')}</button>
+<button class="btn btn-ghost btn-sm" onclick="viewSub('${r.id}','redaction')">${t('rep.redaction')}</button>
+<button class="btn btn-ghost btn-sm" onclick="viewSub('${r.id}','inventory')">${t('rep.inventory')}</button>
+<button class="btn btn-ghost btn-sm" onclick="viewSub('${r.id}','checks')">${t('rep.checks')}</button>
+</div>
+<pre id="rep-${r.id}" style="display:none"></pre></div>`}
+$('#repList').innerHTML=h}catch{$('#repList').textContent='Ошибка'}}
 
-// Config
-async function loadConfig() {
-  try {
-    const data = await api('/api/config');
-    document.getElementById('configPre').textContent = JSON.stringify(data, null, 2);
-  } catch(e) {
-    document.getElementById('configPre').textContent = 'Ошибка загрузки';
-  }
-}
+async function viewSub(id,sub){
+const el=$('#rep-'+id);if(!el)return;
+el.style.display=el.style.display==='none'?'block':'none';
+if(el.style.display==='block'){try{const d=await api(`/api/report/${id}/${sub}`);el.textContent=JSON.stringify(d,null,2)}catch(e){el.textContent='Нет данных: '+sub}}}
 
-// Device
-async function loadDevice() {
-  try {
-    const data = await api('/api/device');
-    document.getElementById('devicePre').textContent = JSON.stringify(data, null, 2);
-  } catch(e) {
-    document.getElementById('devicePre').textContent = 'Ошибка загрузки';
-  }
-}
+let INV_DATA=[];
+async function loadInventory(){
+$('#invTable').innerHTML='<div class="loader">Загрузка...</div>';
+try{const d=await api('/api/reports');
+if(d.reports&&d.reports.length){const rid=d.reports[0].id;
+const inv=await api(`/api/report/${rid}/inventory`);
+INV_DATA=inv.entries||[];renderInv(INV_DATA)}
+else{$('#invTable').innerHTML='<p style="color:var(--muted)">Нет данных инвентаризации</p>'}}catch{$('#invTable').innerHTML='<p style="color:var(--muted)">Ошибка загрузки</p>'}}
 
-// Lang
-function setLang(l) {
-  LANG = l;
-  localStorage.setItem('rdct_lang', l);
-  document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.textContent.trim().toLowerCase() === l));
-}
-setLang(LANG);
+function renderInv(data){
+let h=`<table><tr><th>${t('inv.port')}</th><th>${t('inv.proto')}</th><th>${t('inv.bind')}</th><th>${t('inv.pid')}</th><th>${t('inv.process')}</th><th>${t('inv.package')}</th><th>${t('inv.warn')}</th></tr>`;
+for(const e of data){
+const w=(e.warnings||[]).map(x=>`<span class="tag tag-warn">${typeof x==='string'?x:x.warning||x}</span>`).join(' ');
+h+=`<tr><td><b>${e.port}</b></td><td>${e.proto||''}</td><td><code>${e.bind_addr||''}</code></td><td>${e.pid||''}</td><td>${e.process_name||e.executable||''}</td><td>${e.opkg_package||''}</td><td>${w}</td></tr>`}
+h+='</table>';$('#invTable').innerHTML=h}
+function filterInv(){const q=$('#invSearch').value.toLowerCase();if(!q){renderInv(INV_DATA);return}
+renderInv(INV_DATA.filter(e=>JSON.stringify(e).toLowerCase().includes(q)))}
 
-// Auto-refresh
-setInterval(loadDashboard, 10000);
+let CHECKS_DATA=[];let CHECKS_FILTER='all';
+async function loadChecks(){
+try{const d=await api('/api/reports');
+if(d.reports&&d.reports.length){const rid=d.reports[0].id;
+const ck=await api(`/api/report/${rid}/checks`);
+CHECKS_DATA=ck.checks||[];
+const s=ck.summary||{};
+$('#checkSummary').innerHTML=`
+<div class="card"><h4>${t('ck.total')}</h4><div class="val">${s.total||0}</div></div>
+<div class="card"><h4>${t('ck.crit')}</h4><div class="val stat-err">${s.critical||0}</div></div>
+<div class="card"><h4>${t('ck.warn')}</h4><div class="val stat-warn">${s.warn||0}</div></div>
+<div class="card"><h4>${t('ck.info')}</h4><div class="val stat-accent">${s.info||0}</div></div>`;
+renderChecks()}else{$('#checkSummary').innerHTML='';$('#checkList').innerHTML='<p style="color:var(--muted)">Нет данных</p>'}}catch{}}
+
+function filterChecks(f){CHECKS_FILTER=f;$$('#checkFilters .filter-btn').forEach(b=>b.classList.toggle('active',b.textContent.includes(f==='all'?'Все':f)));renderChecks()}
+function renderChecks(){const items=CHECKS_FILTER==='all'?CHECKS_DATA:CHECKS_DATA.filter(c=>c.severity===CHECKS_FILTER);
+if(!items.length){$('#checkList').innerHTML='<p style="color:var(--muted)">Нет проверок для выбранного фильтра</p>';return}
+let h='<table><tr><th>Severity</th><th>ID</th><th>Описание</th><th>Evidence</th><th>Hint</th></tr>';
+for(const c of items){
+const cls=c.severity==='CRIT'?'sev-crit':c.severity==='WARN'?'sev-warn':'sev-info';
+h+=`<tr><td><span class="${cls}">${c.severity}</span></td><td><code>${c.id}</code></td><td>${c.title||c.description||''}</td><td><code>${typeof c.evidence==='object'?JSON.stringify(c.evidence):c.evidence||''}</code></td><td style="color:var(--muted);font-size:12px">${c.remediation_hint||''}</td></tr>`}
+h+='</table>';$('#checkList').innerHTML=h}
+
+async function loadChain(){
+$('#chainView').innerHTML='<div class="loader">Загрузка...</div>';
+try{const d=await api('/api/reports');
+if(!d.reports||!d.reports.length){$('#chainView').innerHTML='<p style="color:var(--muted)">Нет цепочки</p>';return}
+let h='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+for(let i=0;i<d.reports.length;i++){const r=d.reports[i];
+const type=i===d.reports.length-1?'baseline':'delta';
+h+=`<div style="padding:10px 16px;border:1px solid ${type==='baseline'?'var(--green)':'var(--accent)'};border-radius:8px;text-align:center;min-width:100px">
+<div style="font-size:11px;color:${type==='baseline'?'var(--green)':'var(--accent)'};">${type.toUpperCase()}</div>
+<div style="font-size:12px;margin-top:4px">${r.id.slice(-12)}</div></div>`;
+if(i<d.reports.length-1)h+=`<span style="color:var(--dim)">→</span>`}
+h+='</div>';$('#chainView').innerHTML=h}catch{$('#chainView').textContent='Ошибка'}}
+
+async function loadDevice(){
+try{const d=await api('/api/device');
+$('#devGrid').innerHTML=Object.entries(d).map(([k,v])=>`<div class="card"><h4>${k}</h4><div class="val" style="font-size:16px;word-break:break-all">${v}</div></div>`).join('');
+$('#devRaw').textContent=JSON.stringify(d,null,2)}catch{$('#devRaw').textContent='Ошибка'}}
+
+async function loadApps(){
+$('#appList').innerHTML='<p style="color:var(--muted)">Список сервисов формируется из данных collectors.<br>Запустите сбор для получения информации о сервисах.</p>'}
+
+async function loadSettings(){
+try{const c=await api('/api/config');$('#setCfg').textContent=JSON.stringify(c,null,2)}catch{$('#setCfg').textContent='Ошибка'}}
+
+/* ========== INIT ========== */
+function initApp(){applyI18n();loadDash();setInterval(()=>{if(CUR_PAGE==='dash')loadDash();if(CUR_PAGE==='progress')loadProgress()},5000)}
+
+// Auto-auth from localStorage or URL
+T=localStorage.getItem('rdct_t')||'';
+const up=new URLSearchParams(location.search);
+if(up.get('token')){T=up.get('token');localStorage.setItem('rdct_t',T);history.replaceState({},'','/')}
+if(T){api('/api/progress').then(()=>{$('#auth').style.display='none';$('#app').style.display='flex';initApp()}).catch(()=>{})}
+applyI18n();
 </script>
 </body>
 </html>

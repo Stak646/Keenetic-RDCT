@@ -429,12 +429,39 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     self.send_json({})
 
             elif path == "/api/device":
+                import subprocess, platform
+                def _run(cmd):
+                    try: return subprocess.check_output(cmd, shell=True, timeout=5).decode().strip()
+                    except: return "unknown"
                 info = {
-                    "arch": "$(uname -m 2>/dev/null || echo unknown)",
-                    "kernel": "$(uname -r 2>/dev/null || echo unknown)",
-                    "hostname": "$(hostname 2>/dev/null || echo keenetic)",
+                    "arch": platform.machine(),
+                    "kernel": platform.release(),
+                    "hostname": platform.node(),
+                    "uptime": _run("cat /proc/uptime 2>/dev/null | awk '{print \$1}'"),
+                    "total_ram_kb": _run("awk '/MemTotal/{print \$2}' /proc/meminfo"),
+                    "free_ram_kb": _run("awk '/MemAvailable/{print \$2}' /proc/meminfo"),
+                    "cpu_model": _run("awk -F: '/system type|machine/{gsub(/^ +/,\"\",\$2);print \$2;exit}' /proc/cpuinfo"),
+                    "loadavg": _run("cat /proc/loadavg"),
+                    "entware": os.path.exists("/opt/bin/opkg"),
+                    "disk_free_mb": _run("df -m /opt 2>/dev/null | tail -1 | awk '{print \$4}'"),
                 }
                 self.send_json(info)
+
+            elif path.startswith("/api/report/") and path.endswith("/redaction"):
+                rid = path.split("/")[3]
+                self.send_file_as_json(os.path.join(PREFIX, "reports", rid, "redaction_report.json"))
+
+            elif path.startswith("/api/report/") and path.endswith("/summary"):
+                rid = path.split("/")[3]
+                self.send_file_as_json(os.path.join(PREFIX, "reports", rid, "summary.json"))
+
+            elif path.startswith("/api/report/") and path.endswith("/preflight"):
+                rid = path.split("/")[3]
+                self.send_file_as_json(os.path.join(PREFIX, "reports", rid, "preflight.json"))
+
+            elif path.startswith("/api/report/") and path.endswith("/plan"):
+                rid = path.split("/")[3]
+                self.send_file_as_json(os.path.join(PREFIX, "reports", rid, "plan.json"))
 
             else:
                 self.send_json({"error": "not found"}, 404)
@@ -443,10 +470,44 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         # Static files
         super().do_GET()
 
+    def do_POST(self):
+        path = self.path.split("?")[0]
+        if not self.check_auth():
+            self.send_json({"error": "unauthorized"}, 401)
+            return
+
+        import subprocess
+        if path == "/api/start":
+            try:
+                subprocess.Popen([os.path.join(PREFIX, "cli", "keenetic-debug"), "start"],
+                    stdout=open(os.path.join(PREFIX, "logs", "run.log"), "w"),
+                    stderr=subprocess.STDOUT)
+                self.send_json({"status": "started"})
+            except Exception as e:
+                self.send_json({"error": str(e)}, 500)
+
+        elif path == "/api/stop":
+            sf = os.path.join(PREFIX, "run", "state.json")
+            try:
+                with open(sf, "w") as f: json.dump({"state": "CANCELLED"}, f)
+                self.send_json({"status": "stop_requested"})
+            except Exception as e:
+                self.send_json({"error": str(e)}, 500)
+
+        elif path == "/api/chain/rebase":
+            self.send_json({"status": "rebase_requested", "note": "Use CLI: keenetic-debug chain rebase"})
+
+        elif path == "/api/chain/compact":
+            self.send_json({"status": "compact_requested", "note": "Use CLI: keenetic-debug chain compact"})
+
+        else:
+            self.send_json({"error": "not found"}, 404)
+
     def log_message(self, fmt, *args):
         pass  # Silence
 
 print(f"WebUI listening on {BIND}:{PORT}", flush=True)
+socketserver.TCPServer.allow_reuse_address = True
 with socketserver.TCPServer((BIND, PORT), Handler) as httpd:
     httpd.serve_forever()
 PYEOF
