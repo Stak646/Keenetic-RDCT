@@ -351,9 +351,11 @@ def run_collection(report_id, mode, perf):
     ss_file = os.path.join(report_dir, "collectors", "network.sockets", "artifacts", "ss_tulnp.txt")
     if os.path.exists(ss_file):
         try:
+            seen_ports = set()
             with open(ss_file) as f:
                 for line in f:
-                    if not line.startswith(("tcp","udp")): continue
+                    # Only LISTEN (TCP) and UNCONN (UDP listening)
+                    if "LISTEN" not in line and "UNCONN" not in line: continue
                     parts = line.split()
                     if len(parts) < 5: continue
                     local = parts[4]
@@ -364,6 +366,9 @@ def run_collection(report_id, mode, perf):
                         try: proc = line.split('(("')[1].split('"')[0]
                         except: pass
                     if port.isdigit():
+                        pk = f"{parts[0]}:{port}"
+                        if pk in seen_ports: continue
+                        seen_ports.add(pk)
                         warn = []
                         if bind in ("0.0.0.0","::","*"): warn.append("external_bind")
                         inventory_entries.append({"port":int(port),"proto":parts[0],
@@ -375,23 +380,86 @@ def run_collection(report_id, mode, perf):
 
     # ── Checks (basic) ──
     checks_list = []
-    # Check for 0.0.0.0 binds
+
+    # 1. External bind — only well-known dangerous ports, limit to 10
+    ext_count = 0
     for e in inventory_entries:
-        if "external_bind" in e.get("warnings",[]):
+        if "external_bind" in e.get("warnings",[]) and ext_count < 10:
             checks_list.append({"id":"net.external_bind","severity":"WARN",
-                "title":"Port open on all interfaces","evidence":f"port {e['port']} {e['proto']}",
+                "title":"Port open on all interfaces",
+                "evidence":f"port {e['port']} {e['proto']} ({e.get('process_name','?')})",
                 "remediation_hint":"Review if this port should be exposed to WAN"})
-    # Check dmesg for OOM/segfault
+            ext_count += 1
+    if ext_count >= 10:
+        checks_list.append({"id":"net.many_external","severity":"WARN",
+            "title":f"{sum(1 for e in inventory_entries if 'external_bind' in e.get('warnings',[]))} ports on 0.0.0.0",
+            "evidence":"Multiple","remediation_hint":"Review firewall rules"})
+
+    # 2. Dmesg anomalies
     dmesg = os.path.join(report_dir,"collectors","logs.system","artifacts","dmesg.txt")
     if os.path.exists(dmesg):
         try:
             with open(dmesg) as f: dtxt = f.read()
             if "Out of memory" in dtxt or "oom_kill" in dtxt:
                 checks_list.append({"id":"logs.oom","severity":"CRIT","title":"OOM killer detected",
-                    "evidence":"dmesg","remediation_hint":"Check memory usage"})
+                    "evidence":"dmesg","remediation_hint":"Check memory usage, reduce parallel tasks"})
             if "segfault" in dtxt.lower():
                 checks_list.append({"id":"logs.segfault","severity":"WARN","title":"Segfault detected",
-                    "evidence":"dmesg","remediation_hint":"Check unstable software"})
+                    "evidence":"dmesg","remediation_hint":"Check for unstable packages"})
+            if "error" in dtxt.lower() and "usb" in dtxt.lower():
+                checks_list.append({"id":"logs.usb_error","severity":"WARN","title":"USB errors in dmesg",
+                    "evidence":"dmesg","remediation_hint":"Check USB drive health"})
+        except: pass
+
+    # 3. Device health
+    dev = detect_device()
+    if dev.get("ram_used_pct",0) > 85:
+        checks_list.append({"id":"res.high_ram","severity":"WARN","title":f"High RAM usage: {dev['ram_used_pct']}%",
+            "evidence":f"{dev.get('ram_total_mb',0)}MB total","remediation_hint":"Check for memory leaks"})
+    if dev.get("temp_c",0) > 75:
+        checks_list.append({"id":"res.high_temp","severity":"WARN","title":f"High temperature: {dev['temp_c']}°C",
+            "evidence":"thermal_zone","remediation_hint":"Improve cooling"})
+    try:
+        load1 = float(dev.get("load_1m",0)); cpus = dev.get("cpu_count",1)
+        if load1 > cpus * 2:
+            checks_list.append({"id":"res.high_load","severity":"WARN","title":f"High load: {load1} ({cpus} cores)",
+                "evidence":"loadavg","remediation_hint":"Check for runaway processes"})
+    except: pass
+    try:
+        dfree = int(dev.get("disk_free_mb",9999))
+        if dfree < 100:
+            checks_list.append({"id":"res.low_disk","severity":"CRIT" if dfree<50 else "WARN",
+                "title":f"Low disk: {dfree}MB free","evidence":"df","remediation_hint":"Clean old reports/logs"})
+    except: pass
+
+    # 4. Security checks from firewall
+    fw = os.path.join(report_dir,"collectors","network.firewall","artifacts","iptables_save.txt")
+    if os.path.exists(fw):
+        try:
+            with open(fw) as f: fwtxt = f.read()
+            if fwtxt.count("\n") < 5:
+                checks_list.append({"id":"sec.minimal_firewall","severity":"WARN",
+                    "title":"Very few firewall rules","evidence":"iptables","remediation_hint":"Review firewall config"})
+        except: pass
+
+    # 5. Check for SSH on default port
+    for e in inventory_entries:
+        if e["port"] == 22 and "external_bind" in e.get("warnings",[]):
+            checks_list.append({"id":"sec.ssh_exposed","severity":"CRIT","title":"SSH on port 22 exposed to all interfaces",
+                "evidence":"ss","remediation_hint":"Restrict SSH to LAN only"})
+
+    # 6. Conntrack usage
+    ct_max = os.path.join(report_dir,"collectors","network.conntrack","artifacts","conntrack_max.txt")
+    ct_count = os.path.join(report_dir,"collectors","network.conntrack","artifacts","conntrack_count.txt")
+    if os.path.exists(ct_max) and os.path.exists(ct_count):
+        try:
+            mx = int(open(ct_max).read().strip())
+            cnt = int(open(ct_count).read().strip())
+            pct = round(cnt*100/max(mx,1))
+            if pct > 70:
+                checks_list.append({"id":"net.conntrack_high","severity":"WARN" if pct<90 else "CRIT",
+                    "title":f"Conntrack {pct}% full ({cnt}/{mx})","evidence":"conntrack",
+                    "remediation_hint":"Increase nf_conntrack_max or check for connection floods"})
         except: pass
     write_json("checks.json", {"schema_id":"checks","schema_version":"1","report_id":report_id,
         "summary":{"total":len(checks_list),"critical":sum(1 for c in checks_list if c["severity"]=="CRIT"),
