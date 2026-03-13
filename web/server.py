@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Keenetic-RDCT WebUI Server — full-featured API"""
-import http.server, socketserver, os, json, sys, time, subprocess, platform, re, signal
+"""Keenetic-RDCT WebUI Server v2 — fixed detection, working start, config UI"""
+import http.server, socketserver, os, json, sys, time, subprocess, platform, re, glob, threading
 
-# Config from env or defaults
 PORT = int(os.environ.get("RDCT_PORT", 5000))
 BIND = os.environ.get("RDCT_BIND", "0.0.0.0")
 PREFIX = os.environ.get("RDCT_PREFIX", "/opt/keenetic-debug")
@@ -10,519 +9,509 @@ STATIC = os.path.join(PREFIX, "web", "static")
 TOKEN_FILE = os.path.join(PREFIX, "var", ".auth_token")
 CONFIG_FILE = os.path.join(PREFIX, "config.json")
 
-# Known packages for app manager
-KNOWN_APPS = {
-    "nfqws-keenetic": {
-        "name": "NFQWS Keenetic",
-        "repo": "https://anonym-tsk.github.io/nfqws-keenetic/all",
-        "opkg_conf": "/opt/etc/opkg/nfqws-keenetic.conf",
-        "package": "nfqws-keenetic",
-        "icon": "🛡️",
-        "description_ru": "Обход блокировок через NFQUEUE (оригинал)",
-        "description_en": "DPI bypass via NFQUEUE (original)",
-        "conflicts": [],
-        "service": "S51nfqws-keenetic"
-    },
-    "nfqws2-keenetic": {
-        "name": "NFQWS2 Keenetic",
-        "repo": "https://nfqws.github.io/nfqws2-keenetic/all",
-        "opkg_conf": "/opt/etc/opkg/nfqws2-keenetic.conf",
-        "package": "nfqws2-keenetic",
-        "icon": "🛡️",
-        "description_ru": "Обход блокировок через NFQUEUE v2 (улучшенная)",
-        "description_en": "DPI bypass via NFQUEUE v2 (improved)",
-        "conflicts": ["nfqws-keenetic"],
-        "service": "S51nfqws2-keenetic"
-    },
-    "nfqws-keenetic-web": {
-        "name": "NFQWS Keenetic Web",
-        "repo": "https://nfqws.github.io/nfqws-keenetic-web/all",
-        "opkg_conf": "/opt/etc/opkg/nfqws-keenetic-web.conf",
-        "package": "nfqws-keenetic-web",
-        "icon": "🌐",
-        "description_ru": "Веб-интерфейс для NFQWS",
-        "description_en": "Web interface for NFQWS",
-        "conflicts": [],
-        "service": None
-    },
-    "hydraroute": {
-        "name": "HydraRoute Neo",
-        "repo": "https://raw.githubusercontent.com/Ground-Zerro/HydraRoute/main/install.sh",
-        "opkg_conf": None,
-        "package": None,
-        "icon": "🐉",
-        "install_cmd": "curl -fsSL https://raw.githubusercontent.com/Ground-Zerro/HydraRoute/main/install.sh | sh",
-        "description_ru": "Маршрутизация доменов через VPN для Keenetic",
-        "description_en": "Domain-based VPN routing for Keenetic",
-        "conflicts": ["magitrickle"],
-        "service": None,
-        "check_installed": "/opt/etc/init.d/S52hydra*",
-        "legacy": ["HydraRoute-Classic", "HydraRoute-Relic"]
-    },
-    "magitrickle": {
-        "name": "MagiTrickle",
-        "repo": "https://gitlab.com/magitrickle/magitrickle",
-        "opkg_conf": None,
-        "package": None,
-        "icon": "🎩",
-        "install_cmd": "curl -fsSL https://magitrickle.github.io/install.sh | sh",
-        "description_ru": "Точечная маршрутизация по доменам",
-        "description_en": "Domain-based traffic routing",
-        "conflicts": ["hydraroute"],
-        "service": None,
-        "check_installed": "/opt/etc/init.d/*magitrickle*"
-    },
-    "awg-manager": {
-        "name": "AWG Manager",
-        "repo": "https://github.com/hoaxisr/awg-manager",
-        "opkg_conf": None,
-        "package": None,
-        "icon": "🔐",
-        "install_cmd": "curl -fsSL https://raw.githubusercontent.com/hoaxisr/awg-manager/main/install.sh | sh",
-        "description_ru": "Менеджер туннелей AmneziaWG с веб-интерфейсом",
-        "description_en": "AmneziaWG tunnel manager with web UI",
-        "conflicts": [],
-        "service": None,
-        "check_installed": "/opt/etc/init.d/*awg*"
-    }
-}
-
+# ─── Helpers ──────────────────────────────────────────────────────────────
+def run(cmd, timeout=30):
+    try:
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+        return r.stdout.strip(), r.returncode
+    except: return "", 1
 
 def load_token():
     try: return open(TOKEN_FILE).read().strip()
     except: return ""
 
-def run_cmd(cmd, timeout=30):
+def load_config():
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
-        return {"exit_code": r.returncode, "stdout": r.stdout.strip(), "stderr": r.stderr.strip()}
-    except subprocess.TimeoutExpired:
-        return {"exit_code": 124, "stdout": "", "stderr": "timeout"}
-    except Exception as e:
-        return {"exit_code": 1, "stdout": "", "stderr": str(e)}
+        with open(CONFIG_FILE) as f: return json.load(f)
+    except: return {}
 
+# ─── Known apps ───────────────────────────────────────────────────────────
+APPS = [
+  {"id":"nfqws-keenetic", "name":"NFQWS Keenetic","icon":"🛡️",
+   "desc_ru":"Обход блокировок (оригинал Anonym-tsk)","desc_en":"DPI bypass (original)",
+   "opkg":"nfqws-keenetic","repo_line":"src/gz nfqws-keenetic https://anonym-tsk.github.io/nfqws-keenetic/all",
+   "svc_glob":["S51nfqws*","*nfqws-keenetic*"],"proc_grep":["nfqws"],
+   "conflicts":[]},
+
+  {"id":"nfqws2-keenetic","name":"NFQWS2 Keenetic","icon":"🛡️",
+   "desc_ru":"Обход блокировок v2 (улучшенная)","desc_en":"DPI bypass v2 (improved)",
+   "opkg":"nfqws2-keenetic","repo_line":"src/gz nfqws2-keenetic https://nfqws.github.io/nfqws2-keenetic/all",
+   "svc_glob":["S51nfqws2*","*nfqws2*"],"proc_grep":["nfqws"],
+   "conflicts":["nfqws-keenetic"]},
+
+  {"id":"nfqws-keenetic-web","name":"NFQWS Keenetic Web","icon":"🌐",
+   "desc_ru":"Веб-интерфейс для NFQWS","desc_en":"Web UI for NFQWS",
+   "opkg":"nfqws-keenetic-web","repo_line":"src/gz nfqws-keenetic-web https://nfqws.github.io/nfqws-keenetic-web/all",
+   "svc_glob":["*nfqws*web*"],"proc_grep":["php-fpm","php","nfqws.*web"],
+   "conflicts":[]},
+
+  {"id":"hydraroute","name":"HydraRoute Neo","icon":"🐉",
+   "desc_ru":"Маршрутизация доменов через VPN","desc_en":"Domain-based VPN routing",
+   "opkg":None,
+   "install_cmd":"curl -fsSL https://raw.githubusercontent.com/Ground-Zerro/HydraRoute/main/install.sh | sh",
+   "svc_glob":["*[Hh]ydra*","*hydraroute*","S52hydra*","S99hydra*"],
+   "file_check":["/opt/etc/hydra","/opt/etc/HydraRoute","/opt/sbin/hydra","/opt/bin/hydra"],
+   "proc_grep":["hydra","HydraRoute"],
+   "conflicts":["magitrickle"],
+   "legacy_glob":["*[Hh]ydra*[Cc]lassic*","*[Hh]ydra*[Rr]elic*"]},
+
+  {"id":"magitrickle","name":"MagiTrickle","icon":"🎩",
+   "desc_ru":"Точечная маршрутизация по доменам","desc_en":"Domain-based traffic routing",
+   "opkg":None,
+   "install_cmd":"curl -fsSL https://raw.githubusercontent.com/MagiTrickle/MagiTrickle/main/install.sh | sh",
+   "svc_glob":["*[Mm]agi[Tt]rickle*","*magitrickle*"],
+   "file_check":["/opt/etc/magitrickle","/opt/bin/magitrickle","/opt/sbin/magitrickle"],
+   "proc_grep":["magitrickle","MagiTrickle"],
+   "conflicts":["hydraroute"]},
+
+  {"id":"awg-manager","name":"AWG Manager","icon":"🔐",
+   "desc_ru":"Менеджер туннелей AmneziaWG","desc_en":"AmneziaWG tunnel manager",
+   "opkg":None,
+   "install_cmd":"curl -fsSL https://raw.githubusercontent.com/hoaxisr/awg-manager/main/install.sh | sh",
+   "svc_glob":["*awg*","*amnezia*"],
+   "file_check":["/opt/etc/awg","/opt/etc/awg-manager"],
+   "proc_grep":["awg","amnezia"],
+   "conflicts":[]},
+]
+
+def detect_app_status():
+    """Detect installed/running for all known apps"""
+    # Pre-fetch: list of init.d files and running processes
+    initd_files = glob.glob("/opt/etc/init.d/*") if os.path.isdir("/opt/etc/init.d") else []
+    ps_out, _ = run("ps w 2>/dev/null || ps aux 2>/dev/null")
+
+    results = []
+    for app in APPS:
+        a = {**app, "installed": False, "running": False, "version": "",
+             "conflict_warning": "", "upgrade_hint": "", "svc_path": ""}
+
+        # ── Check installed ──
+        # 1) opkg
+        if app.get("opkg"):
+            out, rc = run(f"opkg status {app['opkg']} 2>/dev/null")
+            if "install ok installed" in out or "Status: install" in out:
+                a["installed"] = True
+                for line in out.split("\n"):
+                    if line.startswith("Version:"): a["version"] = line.split(":",1)[1].strip()
+
+        # 2) init.d service files
+        if not a["installed"]:
+            for pat in app.get("svc_glob", []):
+                for f in initd_files:
+                    bn = os.path.basename(f)
+                    try:
+                        if glob.fnmatch.fnmatch(bn, pat):
+                            a["installed"] = True; a["svc_path"] = f; break
+                    except: pass
+                if a["installed"]: break
+
+        # 3) file_check paths
+        if not a["installed"]:
+            for fp in app.get("file_check", []):
+                if os.path.exists(fp):
+                    a["installed"] = True; break
+
+        # ── Find service path if not yet ──
+        if not a["svc_path"]:
+            for pat in app.get("svc_glob", []):
+                for f in initd_files:
+                    bn = os.path.basename(f)
+                    try:
+                        if glob.fnmatch.fnmatch(bn, pat):
+                            a["svc_path"] = f; break
+                    except: pass
+                if a["svc_path"]: break
+
+        # ── Check running ──
+        # 1) Via service script status
+        if a["svc_path"]:
+            out, _ = run(f'"{a["svc_path"]}" status 2>/dev/null')
+            low = out.lower()
+            if "running" in low or "alive" in low or "started" in low or "active" in low:
+                a["running"] = True
+
+        # 2) Via ps grep (catch actual daemon processes)
+        if not a["running"]:
+            for pat in app.get("proc_grep", []):
+                for line in ps_out.split("\n"):
+                    if re.search(pat, line, re.IGNORECASE) and "grep" not in line:
+                        a["running"] = True; break
+                if a["running"]: break
+
+        # ── Conflicts ──
+        for cid in app.get("conflicts", []):
+            for other in APPS:
+                if other["id"] != cid: continue
+                # Quick check if conflict is installed
+                c_installed = False
+                if other.get("opkg"):
+                    out2, _ = run(f"opkg status {other['opkg']} 2>/dev/null | head -3")
+                    if "install" in out2: c_installed = True
+                if not c_installed:
+                    for fp in other.get("file_check", []):
+                        if os.path.exists(fp): c_installed = True; break
+                if not c_installed:
+                    for pat in other.get("svc_glob", []):
+                        for f in initd_files:
+                            try:
+                                if glob.fnmatch.fnmatch(os.path.basename(f), pat): c_installed = True; break
+                            except: pass
+                        if c_installed: break
+                if c_installed:
+                    a["conflict_warning"] = f"⚠️ Может конфликтовать с {other['name']}! / May conflict with {other['name']}!"
+
+        # ── Legacy (HydraRoute) ──
+        for pat in app.get("legacy_glob", []):
+            for f in initd_files:
+                try:
+                    if glob.fnmatch.fnmatch(os.path.basename(f), pat):
+                        a["upgrade_hint"] = "Обнаружена старая версия! Рекомендуется обновить на Neo / Old version detected — upgrade to Neo recommended"
+                except: pass
+
+        # Clean up internal fields
+        for k in ["svc_glob","proc_grep","file_check","opkg","repo_line","install_cmd","legacy_glob","conflicts"]:
+            a.pop(k, None)
+
+        results.append(a)
+    return results
+
+# ─── Device detection ─────────────────────────────────────────────────────
 def detect_device():
-    """Full device detection including model"""
-    info = {
-        "arch": platform.machine(),
-        "kernel": platform.release(),
-        "hostname": platform.node(),
-    }
-    # Model from /proc/cpuinfo
-    try:
-        with open("/proc/cpuinfo") as f:
-            for line in f:
-                if "system type" in line.lower() or "machine" in line.lower() or "hardware" in line.lower():
-                    info["cpu_model"] = line.split(":")[-1].strip()
-                    break
-    except: pass
+    info = {"arch": platform.machine(), "kernel": platform.release(), "hostname": platform.node()}
 
-    # Try ndmc for Keenetic model
-    r = run_cmd("ndmc -c 'show version' 2>/dev/null | head -20", timeout=5)
-    if r["exit_code"] == 0 and r["stdout"]:
-        for line in r["stdout"].split("\n"):
-            if "device:" in line.lower() or "model:" in line.lower() or "description:" in line.lower():
-                info["model"] = line.split(":")[-1].strip()
-            if "title:" in line.lower():
-                info["model_title"] = line.split(":")[-1].strip()
-            if "release:" in line.lower() or "version:" in line.lower():
-                info["firmware"] = line.split(":")[-1].strip()
-            if "sandbox:" in line.lower() or "region:" in line.lower():
-                info["region"] = line.split(":")[-1].strip()
-
-    # RCI JSON for model
-    r = run_cmd("ndmc -c 'show version' 2>/dev/null", timeout=5)
-    if r["exit_code"] == 0:
+    # Keenetic model via ndmc
+    out, rc = run("ndmc -c 'show version' 2>/dev/null", 5)
+    if rc == 0 and out:
+        for line in out.split("\n"):
+            ll = line.strip().lower()
+            kv = line.split(":",1)
+            if len(kv) == 2:
+                k, v = kv[0].strip().lower(), kv[1].strip()
+                if k in ("device","model"): info["model"] = v
+                elif k == "title": info["model_title"] = v
+                elif k in ("release","version","sw_version"): info["firmware"] = v
+                elif k == "region": info["region"] = v
+                elif k == "hw_id": info["hw_id"] = v
+        # Try JSON parse
         try:
-            # Try parse as JSON (some versions output JSON)
-            d = json.loads(r["stdout"])
-            info["model"] = d.get("device", info.get("model", ""))
-            info["firmware"] = d.get("release", info.get("firmware", ""))
-            info["model_title"] = d.get("title", info.get("model_title", ""))
+            d = json.loads(out)
+            for k in ("device","model","title","release","region","hw_id","hw_version","manufacturer"):
+                if k in d and d[k]: info[k] = d[k]
         except: pass
 
-    # Fallback model detection from /tmp or hostname
-    if "model" not in info or not info["model"]:
-        r2 = run_cmd("cat /tmp/sysinfo/model 2>/dev/null || cat /proc/device-tree/model 2>/dev/null || echo ''", timeout=3)
-        info["model"] = r2["stdout"] or info.get("hostname", "Unknown")
+    if "model" not in info:
+        out, _ = run("cat /tmp/sysinfo/model 2>/dev/null || cat /proc/device-tree/model 2>/dev/null")
+        if out: info["model"] = out
 
-    # System metrics
+    # CPU
     try:
-        with open("/proc/uptime") as f: info["uptime_s"] = float(f.read().split()[0])
-        info["uptime_human"] = f"{int(info['uptime_s']//86400)}d {int((info['uptime_s']%86400)//3600)}h {int((info['uptime_s']%3600)//60)}m"
+        with open("/proc/cpuinfo") as f:
+            cpuinfo = f.read()
+            for line in cpuinfo.split("\n"):
+                ll = line.lower()
+                if any(x in ll for x in ["system type","hardware","machine","model name"]):
+                    info["cpu_model"] = line.split(":",1)[1].strip(); break
+            info["cpu_count"] = cpuinfo.count("processor\t")
     except: pass
+
+    # Memory
     try:
         with open("/proc/meminfo") as f:
             for line in f:
                 if "MemTotal" in line: info["ram_total_kb"] = int(line.split()[1])
-                if "MemAvailable" in line: info["ram_free_kb"] = int(line.split()[1])
-                if "MemFree" in line and "ram_free_kb" not in info: info["ram_free_kb"] = int(line.split()[1])
-        if "ram_total_kb" in info:
-            info["ram_total_mb"] = info["ram_total_kb"] // 1024
-            info["ram_used_pct"] = round(100 * (1 - info.get("ram_free_kb",0) / info["ram_total_kb"]), 1)
+                elif "MemAvailable" in line: info["ram_free_kb"] = int(line.split()[1])
+                elif "MemFree" in line and "ram_free_kb" not in info: info["ram_free_kb"] = int(line.split()[1])
+        info["ram_total_mb"] = info.get("ram_total_kb",0) // 1024
+        info["ram_used_pct"] = round(100*(1 - info.get("ram_free_kb",1)/max(info.get("ram_total_kb",1),1)),1)
     except: pass
+
+    # Load
     try:
-        with open("/proc/loadavg") as f:
-            parts = f.read().split()
-            info["load_1m"] = parts[0]; info["load_5m"] = parts[1]; info["load_15m"] = parts[2]
+        parts = open("/proc/loadavg").read().split()
+        info["load_1m"], info["load_5m"], info["load_15m"] = parts[0], parts[1], parts[2]
     except: pass
+
+    # Uptime
+    try:
+        sec = float(open("/proc/uptime").read().split()[0])
+        info["uptime_s"] = sec
+        d,r = divmod(int(sec),86400); h,r = divmod(r,3600); m,_ = divmod(r,60)
+        info["uptime_human"] = f"{d}d {h}h {m}m"
+    except: pass
+
     # Disk
-    r = run_cmd("df -m /opt 2>/dev/null | tail -1", timeout=5)
-    if r["stdout"]:
-        parts = r["stdout"].split()
-        if len(parts) >= 4:
-            info["disk_total_mb"] = parts[1]
-            info["disk_used_mb"] = parts[2]
-            info["disk_free_mb"] = parts[3]
+    out, _ = run("df -m /opt 2>/dev/null | tail -1")
+    if out:
+        p = out.split()
+        if len(p)>=4: info["disk_total_mb"]=p[1]; info["disk_used_mb"]=p[2]; info["disk_free_mb"]=p[3]
 
-    # CPU count
-    try:
-        with open("/proc/cpuinfo") as f:
-            info["cpu_count"] = sum(1 for l in f if l.startswith("processor"))
-    except: pass
-
-    # Temperature
-    r = run_cmd("cat /sys/class/thermal/thermal_zone*/temp 2>/dev/null | head -1", timeout=3)
-    if r["stdout"]:
-        try: info["temp_c"] = round(int(r["stdout"]) / 1000, 1)
+    # Temp
+    out, _ = run("cat /sys/class/thermal/thermal_zone*/temp 2>/dev/null | head -1")
+    if out:
+        try: info["temp_c"] = round(int(out)/1000,1)
         except: pass
 
     info["entware"] = os.path.exists("/opt/bin/opkg")
     return info
 
-def get_app_status():
-    """Check installed status and running state of known apps"""
-    apps = []
-    for aid, app in KNOWN_APPS.items():
-        status = {"id": aid, **app, "installed": False, "running": False, "version": ""}
+# ─── Collection runner ────────────────────────────────────────────────────
+def run_collection(report_id, mode, perf):
+    """Run all collectors in a thread — writes results to reports/"""
+    report_dir = os.path.join(PREFIX, "reports", report_id)
+    state_file = os.path.join(PREFIX, "run", "state.json")
+    coll_dir = os.path.join(PREFIX, "collectors")
 
-        # Check via opkg
-        if app.get("package"):
-            r = run_cmd(f"opkg status {app['package']} 2>/dev/null | head -5", timeout=5)
-            if "Status: install" in r["stdout"]:
-                status["installed"] = True
-                for line in r["stdout"].split("\n"):
-                    if line.startswith("Version:"):
-                        status["version"] = line.split(":")[1].strip()
+    # Get list of collectors
+    collectors = []
+    if os.path.isdir(coll_dir):
+        for d in sorted(os.listdir(coll_dir)):
+            if d.startswith("_") or d.startswith("test."): continue
+            rs = os.path.join(coll_dir, d, "run.sh")
+            if os.path.exists(rs): collectors.append((d, rs))
 
-        # Check via glob pattern
-        if app.get("check_installed"):
-            import glob
-            if glob.glob(app["check_installed"]):
-                status["installed"] = True
+    total = len(collectors)
+    done = 0
+    results_summary = {"ok":0,"skip":0,"fail":0,"timeout":0}
 
-        # Check running
-        if app.get("service"):
-            r = run_cmd(f"ls /opt/etc/init.d/{app['service']}* 2>/dev/null && /opt/etc/init.d/{app['service']}* status 2>/dev/null", timeout=5)
-            if "running" in r["stdout"].lower() or "alive" in r["stdout"].lower():
-                status["running"] = True
-        else:
-            # Generic check by name
-            r = run_cmd(f"ps w 2>/dev/null | grep -i '{aid}' | grep -v grep", timeout=3)
-            if r["stdout"]:
-                status["running"] = True
+    for cid, script in collectors:
+        done += 1
+        cwd = os.path.join(report_dir, "collectors", cid)
+        os.makedirs(os.path.join(cwd, "artifacts"), exist_ok=True)
 
-        # Check conflicts
-        status["conflict_warning"] = ""
-        for cid in app.get("conflicts", []):
-            if cid in KNOWN_APPS:
-                capp = KNOWN_APPS[cid]
-                # Check if conflict is installed
-                if capp.get("package"):
-                    r = run_cmd(f"opkg status {capp['package']} 2>/dev/null | grep 'Status: install'", timeout=3)
-                    if r["stdout"]:
-                        status["conflict_warning"] = f"Конфликт с {capp['name']}! / Conflicts with {capp['name']}!"
-                if capp.get("check_installed"):
-                    import glob
-                    if glob.glob(capp["check_installed"]):
-                        status["conflict_warning"] = f"Конфликт с {capp['name']}! / Conflicts with {capp['name']}!"
+        # Update progress
+        pct = int(done * 100 / max(total, 1))
+        state = {"state":"RUNNING","report_id":report_id,"overall_pct":pct,
+                 "current_collector":cid,"done":done,"total":total}
+        try:
+            with open(state_file,"w") as f: json.dump(state,f)
+        except: pass
 
-        # Check legacy versions (HydraRoute)
-        if app.get("legacy"):
-            for leg in app["legacy"]:
-                r = run_cmd(f"ls /opt/etc/init.d/*{leg.lower().replace('-','')}* 2>/dev/null || opkg status {leg.lower()} 2>/dev/null | grep Status", timeout=3)
-                if r["stdout"]:
-                    status["legacy_detected"] = leg
-                    status["upgrade_hint"] = f"Обнаружена старая версия ({leg}). Рекомендуется обновить на Neo."
+        # Run collector
+        env = os.environ.copy()
+        env.update({
+            "TOOL_BASE_DIR": PREFIX, "COLLECTOR_WORKDIR": cwd,
+            "COLLECTOR_ID": cid, "TOOL_REPORT_ID": report_id,
+            "RESEARCH_MODE": mode, "PERF_MODE": perf,
+        })
+        try:
+            r = subprocess.run(["sh", script], cwd=cwd, env=env,
+                capture_output=True, text=True, timeout=30)
+            with open(os.path.join(cwd, "stdout.log"), "w") as f:
+                f.write(r.stdout + "\n" + r.stderr)
+            if r.returncode == 0: results_summary["ok"] += 1
+            else: results_summary["fail"] += 1
+        except subprocess.TimeoutExpired:
+            results_summary["timeout"] += 1
+        except Exception as e:
+            results_summary["fail"] += 1
 
-        apps.append(status)
-    return apps
+    # Write device info
+    try:
+        with open(os.path.join(report_dir, "device.json"), "w") as f:
+            json.dump(detect_device(), f, indent=2, ensure_ascii=False)
+    except: pass
 
+    # Write summary
+    try:
+        with open(os.path.join(report_dir, "summary.json"), "w") as f:
+            json.dump({"schema_id":"summary","report_id":report_id,
+                "mode":mode,"perf":perf,"collectors":results_summary,
+                "finished_at":time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime())}, f, indent=2)
+    except: pass
 
-class Handler(http.server.SimpleHTTPRequestHandler):
-    def __init__(self, *a, **kw):
-        super().__init__(*a, directory=STATIC, **kw)
+    # Write manifest
+    try:
+        files = []
+        for root, dirs, fnames in os.walk(report_dir):
+            for fn in fnames:
+                fp = os.path.join(root, fn)
+                rel = os.path.relpath(fp, report_dir)
+                sz = os.path.getsize(fp)
+                files.append({"path":rel,"size":sz})
+        with open(os.path.join(report_dir, "manifest.json"), "w") as f:
+            json.dump({"schema_id":"manifest","schema_version":"1","report_id":report_id,
+                "created_at":time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),
+                "total_files":len(files),"files":files}, f, indent=2)
+    except: pass
 
-    def check_auth(self):
-        token = load_token()
-        if not token: return True
-        auth = self.headers.get("Authorization", "")
-        if auth == f"Bearer {token}": return True
-        if "?" in self.path:
-            qs = self.path.split("?", 1)[1]
-            if f"token={token}" in qs: return True
+    # Done
+    try:
+        with open(state_file,"w") as f:
+            json.dump({"state":"DONE","report_id":report_id,
+                "summary":results_summary}, f)
+    except: pass
+
+# ─── HTTP Handler ─────────────────────────────────────────────────────────
+class H(http.server.SimpleHTTPRequestHandler):
+    def __init__(s, *a, **kw): super().__init__(*a, directory=STATIC, **kw)
+    def check_auth(s):
+        t = load_token()
+        if not t: return True
+        a = s.headers.get("Authorization","")
+        if a == f"Bearer {t}": return True
+        if "?" in s.path and f"token={t}" in s.path.split("?",1)[1]: return True
         return False
-
-    def send_json(self, data, code=200):
-        body = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
-        self.send_response(code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
-        self.end_headers()
-        self.wfile.write(body)
-
-    def send_file_json(self, path):
+    def json(s, d, code=200):
+        b = json.dumps(d, ensure_ascii=False, indent=2).encode()
+        s.send_response(code)
+        s.send_header("Content-Type","application/json;charset=utf-8")
+        s.send_header("Content-Length",str(len(b)))
+        s.send_header("Access-Control-Allow-Origin","*")
+        s.send_header("Access-Control-Allow-Headers","Authorization,Content-Type")
+        s.end_headers(); s.wfile.write(b)
+    def file_json(s, p):
         try:
-            with open(path) as f: self.send_json(json.load(f))
-        except: self.send_json({"error": f"file not found: {os.path.basename(path)}"}, 404)
-
-    def read_body(self):
+            with open(p) as f: s.json(json.load(f))
+        except: s.json({"error":f"not found: {os.path.basename(p)}"},404)
+    def body(s):
         try:
-            length = int(self.headers.get("Content-Length", 0))
-            if length > 0: return json.loads(self.rfile.read(length))
+            n = int(s.headers.get("Content-Length",0))
+            if n>0: return json.loads(s.rfile.read(n))
         except: pass
         return {}
+    def do_OPTIONS(s):
+        s.send_response(200)
+        for h,v in [("Access-Control-Allow-Origin","*"),("Access-Control-Allow-Methods","GET,POST,OPTIONS"),
+                     ("Access-Control-Allow-Headers","Authorization,Content-Type")]:
+            s.send_header(h,v)
+        s.end_headers()
+    def log_message(s,*a): pass
 
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
-        self.end_headers()
-
-    def do_GET(self):
-        path = self.path.split("?")[0]
-
-        if path == "/health":
-            ver = "unknown"
-            try: ver = open(os.path.join(PREFIX, "VERSION")).read().strip()
+    def do_GET(s):
+        p = s.path.split("?")[0]
+        if p == "/health":
+            v = "?"
+            try: v = open(os.path.join(PREFIX,"VERSION")).read().strip()
             except: pass
-            self.send_json({"status": "ok", "version": ver, "port": PORT})
-            return
+            s.json({"status":"ok","version":v,"port":PORT}); return
+        if not p.startswith("/api/"): super().do_GET(); return
+        if not s.check_auth(): s.json({"error":"unauthorized"},401); return
 
-        if path.startswith("/api/"):
-            if not self.check_auth():
-                self.send_json({"error": "unauthorized"}, 401)
-                return
-            self._handle_api_get(path)
-            return
-
-        super().do_GET()
-
-    def _handle_api_get(self, path):
-        if path == "/api/progress":
-            sf = os.path.join(PREFIX, "run", "state.json")
-            if os.path.exists(sf): self.send_file_json(sf)
-            else: self.send_json({"state": "idle"})
-
-        elif path == "/api/device":
-            self.send_json(detect_device())
-
-        elif path == "/api/config":
-            if os.path.exists(CONFIG_FILE): self.send_file_json(CONFIG_FILE)
-            else: self.send_json({})
-
-        elif path == "/api/reports":
-            rdir = os.path.join(PREFIX, "reports")
-            reports = []
-            if os.path.isdir(rdir):
-                for d in sorted(os.listdir(rdir), reverse=True):
-                    dp = os.path.join(rdir, d)
+        if p=="/api/progress":
+            sf=os.path.join(PREFIX,"run","state.json")
+            s.file_json(sf) if os.path.exists(sf) else s.json({"state":"idle"})
+        elif p=="/api/device": s.json(detect_device())
+        elif p=="/api/config": s.file_json(CONFIG_FILE) if os.path.exists(CONFIG_FILE) else s.json({})
+        elif p=="/api/apps": s.json({"apps":detect_app_status()})
+        elif p=="/api/reports":
+            rd=os.path.join(PREFIX,"reports"); reps=[]
+            if os.path.isdir(rd):
+                for d in sorted(os.listdir(rd),reverse=True):
+                    dp=os.path.join(rd,d)
                     if os.path.isdir(dp):
-                        sz = sum(os.path.getsize(os.path.join(dp,f)) for f in os.listdir(dp) if os.path.isfile(os.path.join(dp,f)))
-                        reports.append({"id": d, "size_bytes": sz})
-            self.send_json({"reports": reports})
+                        sz=sum(os.path.getsize(os.path.join(dp,f)) for f in os.listdir(dp) if os.path.isfile(os.path.join(dp,f)))
+                        reps.append({"id":d,"size_bytes":sz})
+            s.json({"reports":reps})
+        elif re.match(r"/api/report/[^/]+/(manifest|checks|inventory|redaction|summary|preflight|plan)",p):
+            pts=p.split("/"); rid,sub=pts[3],pts[4]
+            fmap={"redaction":"redaction_report.json"}
+            s.file_json(os.path.join(PREFIX,"reports",rid,fmap.get(sub,sub+".json")))
+        elif p.startswith("/api/i18n/"):
+            s.file_json(os.path.join(PREFIX,"i18n",p.split("/")[-1]+".json"))
+        elif p=="/api/preflight": s.json({"message":"Use POST /api/preflight/run"})
+        else: s.json({"error":"not found"},404)
 
-        elif path == "/api/apps":
-            self.send_json({"apps": get_app_status()})
+    def do_POST(s):
+        p = s.path.split("?")[0]
+        if not s.check_auth(): s.json({"error":"unauthorized"},401); return
+        b = s.body()
 
-        elif re.match(r"/api/report/[^/]+/(manifest|checks|inventory|redaction|summary|preflight|plan)", path):
-            parts = path.split("/")
-            rid, sub = parts[3], parts[4]
-            fmap = {"manifest":"manifest.json","checks":"checks.json","inventory":"inventory.json",
-                    "redaction":"redaction_report.json","summary":"summary.json","preflight":"preflight.json","plan":"plan.json"}
-            self.send_file_json(os.path.join(PREFIX, "reports", rid, fmap.get(sub, sub+".json")))
+        if p=="/api/start":
+            mode=b.get("mode","light"); perf=b.get("perf","lite")
+            rid = f"report-{int(time.time())}"
+            rd = os.path.join(PREFIX,"reports",rid)
+            os.makedirs(os.path.join(rd,"collectors"),exist_ok=True)
+            # Write initial state
+            with open(os.path.join(PREFIX,"run","state.json"),"w") as f:
+                json.dump({"state":"RUNNING","report_id":rid,"overall_pct":0},f)
+            # Run in background thread
+            t = threading.Thread(target=run_collection, args=(rid,mode,perf), daemon=True)
+            t.start()
+            s.json({"status":"started","report_id":rid})
 
-        elif path.startswith("/api/i18n/"):
-            lang = path.split("/")[-1]
-            lf = os.path.join(PREFIX, "i18n", f"{lang}.json")
-            if os.path.exists(lf): self.send_file_json(lf)
-            else: self.send_json({})
+        elif p=="/api/stop":
+            with open(os.path.join(PREFIX,"run","state.json"),"w") as f:
+                json.dump({"state":"CANCELLED"},f)
+            s.json({"status":"cancelled"})
 
-        elif path == "/api/preflight":
-            # Run actual preflight
-            r = run_cmd(f"sh {PREFIX}/collectors/system.base/run.sh 2>&1; echo '---'; cat /proc/cpuinfo 2>/dev/null | head -5; echo '---'; df -h 2>/dev/null; echo '---'; ip addr show 2>/dev/null | head -30", timeout=15)
-            caps = {}
-            for cmd in ["ip","ss","iptables","opkg","tar","python3","curl","wget","jq","dmesg","wg","ndmc"]:
-                caps[cmd] = run_cmd(f"command -v {cmd}", timeout=2)["exit_code"] == 0
-            self.send_json({"capabilities": caps, "output": r["stdout"][:5000], "arch": platform.machine()})
-
-        else:
-            self.send_json({"error": "not found"}, 404)
-
-    def do_POST(self):
-        path = self.path.split("?")[0]
-        if not self.check_auth():
-            self.send_json({"error": "unauthorized"}, 401)
-            return
-
-        body = self.read_body()
-
-        if path == "/api/start":
-            mode = body.get("mode", "light")
-            perf = body.get("perf", "lite")
-            # Create a simple collection run
-            report_id = f"report-{int(time.time())}"
-            report_dir = os.path.join(PREFIX, "reports", report_id)
-            os.makedirs(report_dir, exist_ok=True)
-            os.makedirs(os.path.join(report_dir, "collectors"), exist_ok=True)
-
-            # Write state
-            state = {"state": "RUNNING", "report_id": report_id, "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
-            with open(os.path.join(PREFIX, "run", "state.json"), "w") as f: json.dump(state, f)
-
-            # Run collection in background
-            cmd = f"cd {PREFIX} && sh -c '"
-            cmd += f"export TOOL_BASE_DIR={PREFIX} COLLECTOR_WORKDIR={report_dir} TOOL_REPORT_ID={report_id} RESEARCH_MODE={mode} PERF_MODE={perf}; "
-            # Run each collector
-            cmd += f"for c in {PREFIX}/collectors/*/run.sh; do "
-            cmd += f'  cid=$(basename $(dirname "$c")); '
-            cmd += f'  [ "$cid" = "_template" ] && continue; '
-            cmd += f'  echo "$cid" | grep -q "^test\\." && continue; '
-            cmd += f'  mkdir -p {report_dir}/collectors/$cid/artifacts; '
-            cmd += f'  export COLLECTOR_ID=$cid COLLECTOR_WORKDIR={report_dir}/collectors/$cid; '
-            cmd += f'  timeout 30 sh "$c" >{report_dir}/collectors/$cid/stdout.log 2>&1 || true; '
-            cmd += f"done; "
-            # Write device info
-            cmd += f"echo \'{json.dumps(detect_device())}\' > {report_dir}/device.json; "
-            # Manifest
-            cmd += f'echo \'{{"schema_id":"manifest","schema_version":"1","report_id":"{report_id}","created_at":"\'$(date -u +%Y-%m-%dT%H:%M:%SZ)\'"}}\' > {report_dir}/manifest.json; '
-            # Done state
-            cmd += f'echo \'{{"state":"DONE","report_id":"{report_id}"}}\' > {PREFIX}/run/state.json'
-            cmd += "'"
-
-            subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            self.send_json({"status": "started", "report_id": report_id})
-
-        elif path == "/api/stop":
-            with open(os.path.join(PREFIX, "run", "state.json"), "w") as f:
-                json.dump({"state": "CANCELLED"}, f)
-            self.send_json({"status": "cancelled"})
-
-        elif path == "/api/config":
-            # Save config
+        elif p=="/api/config":
             try:
-                with open(CONFIG_FILE, "w") as f:
-                    json.dump(body, f, indent=2, ensure_ascii=False)
-                self.send_json({"status": "saved"})
-            except Exception as e:
-                self.send_json({"error": str(e)}, 500)
+                with open(CONFIG_FILE,"w") as f: json.dump(b,f,indent=2,ensure_ascii=False)
+                s.json({"status":"saved"})
+            except Exception as e: s.json({"error":str(e)},500)
 
-        elif path == "/api/app/install":
-            aid = body.get("app_id", "")
-            app = KNOWN_APPS.get(aid)
-            if not app:
-                self.send_json({"error": f"Unknown app: {aid}"}, 400)
-                return
-            # opkg-based install
-            if app.get("package") and app.get("repo"):
-                cmds = [
-                    f"mkdir -p /opt/etc/opkg",
-                    f'echo "src/gz {aid} {app["repo"]}" > {app["opkg_conf"]}',
-                    f"opkg update 2>&1",
-                    f"opkg install {app['package']} 2>&1"
-                ]
-                output = ""
-                for c in cmds:
-                    r = run_cmd(c, timeout=60)
-                    output += r["stdout"] + "\n" + r["stderr"] + "\n"
-                self.send_json({"status": "done", "output": output.strip()})
-            elif app.get("install_cmd"):
-                r = run_cmd(app["install_cmd"], timeout=120)
-                self.send_json({"status": "done", "output": r["stdout"] + "\n" + r["stderr"]})
-            else:
-                self.send_json({"error": "No install method"}, 400)
-
-        elif path == "/api/app/remove":
-            aid = body.get("app_id", "")
-            app = KNOWN_APPS.get(aid)
-            if not app:
-                self.send_json({"error": f"Unknown app: {aid}"}, 400)
-                return
-            if app.get("package"):
-                r = run_cmd(f"opkg remove {app['package']} 2>&1", timeout=30)
-                if app.get("opkg_conf"):
-                    run_cmd(f"rm -f {app['opkg_conf']}", timeout=5)
-                self.send_json({"status": "done", "output": r["stdout"] + "\n" + r["stderr"]})
-            else:
-                self.send_json({"error": "Manual removal required"}, 400)
-
-        elif path == "/api/app/control":
-            aid = body.get("app_id", "")
-            action = body.get("action", "status")  # start/stop/restart/status
-            app = KNOWN_APPS.get(aid)
-            if not app:
-                self.send_json({"error": f"Unknown app: {aid}"}, 400)
-                return
-            import glob
-            svc = None
-            if app.get("service"):
-                matches = glob.glob(f"/opt/etc/init.d/{app['service']}*")
-                if matches: svc = matches[0]
-            if not svc:
-                # Try finding by app id
-                matches = glob.glob(f"/opt/etc/init.d/*{aid.replace('-','')}*") + glob.glob(f"/opt/etc/init.d/*{aid}*")
-                if matches: svc = matches[0]
-            if svc:
-                r = run_cmd(f"{svc} {action} 2>&1", timeout=15)
-                self.send_json({"status": "done", "action": action, "output": r["stdout"] + "\n" + r["stderr"]})
-            else:
-                self.send_json({"error": "Service script not found"}, 404)
-
-        elif path == "/api/preflight/run":
-            # Run real preflight
-            caps = {}
+        elif p=="/api/preflight/run":
+            caps={}
             for cmd in ["ip","ss","iptables","opkg","tar","python3","curl","wget","jq","dmesg","wg","ndmc","iw"]:
-                caps[cmd] = run_cmd(f"command -v {cmd}", timeout=2)["exit_code"] == 0
-
-            warnings = []
-            # Check disk
-            r = run_cmd("df -m /opt 2>/dev/null | tail -1 | awk '{print $4}'", timeout=5)
-            free = int(r["stdout"]) if r["stdout"].isdigit() else 0
-            if free < 50: warnings.append({"severity":"CRIT","msg":f"Low disk: {free}MB free"})
-            elif free < 200: warnings.append({"severity":"WARN","msg":f"Disk space: {free}MB free"})
-
-            # Check RAM
-            r = run_cmd("awk '/MemAvailable/{print $2}' /proc/meminfo", timeout=3)
-            ram_free = int(r["stdout"]) if r["stdout"].isdigit() else 0
-            if ram_free < 32768: warnings.append({"severity":"WARN","msg":f"Low RAM: {ram_free//1024}MB available"})
-
-            # List collectors
-            collectors = []
-            cdir = os.path.join(PREFIX, "collectors")
-            if os.path.isdir(cdir):
-                for d in sorted(os.listdir(cdir)):
+                out,rc = run(f"command -v {cmd}",2)
+                caps[cmd] = rc==0
+            warns=[]
+            out,_ = run("df -m /opt 2>/dev/null|tail -1|awk '{print $4}'",5)
+            free = int(out) if out.isdigit() else 0
+            if free<50: warns.append({"severity":"CRIT","msg":f"Мало места: {free}MB / Low disk: {free}MB"})
+            elif free<200: warns.append({"severity":"WARN","msg":f"Диск: {free}MB / Disk: {free}MB"})
+            out,_=run("awk '/MemAvailable/{print $2}' /proc/meminfo",3)
+            ramf=int(out) if out.isdigit() else 0
+            if ramf<32768: warns.append({"severity":"WARN","msg":f"Мало RAM: {ramf//1024}MB / Low RAM: {ramf//1024}MB"})
+            colls=[]
+            cd=os.path.join(PREFIX,"collectors")
+            if os.path.isdir(cd):
+                for d in sorted(os.listdir(cd)):
                     if d.startswith("_") or d.startswith("test."): continue
-                    pj = os.path.join(cdir, d, "plugin.json")
+                    pj=os.path.join(cd,d,"plugin.json")
                     if os.path.exists(pj):
                         try:
-                            with open(pj) as f: meta = json.load(f)
-                            collectors.append({"id": d, "name": meta.get("name",d), "status": "INCLUDE",
-                                "reason": "available", "timeout_s": meta.get("timeout_s",60)})
-                        except:
-                            collectors.append({"id": d, "name": d, "status": "SKIP", "reason": "invalid plugin.json"})
+                            m=json.load(open(pj))
+                            colls.append({"id":d,"name":m.get("name",d),"status":"INCLUDE","reason":"available","timeout_s":m.get("timeout_s",60)})
+                        except: colls.append({"id":d,"name":d,"status":"SKIP","reason":"bad plugin.json"})
+            s.json({"capabilities":caps,"warnings":warns,"collectors":colls,"disk_free_mb":free,"ram_free_kb":ramf})
 
-            self.send_json({"capabilities": caps, "warnings": warnings, "collectors": collectors,
-                           "disk_free_mb": free, "ram_free_kb": ram_free})
+        elif p=="/api/app/install":
+            aid=b.get("app_id","")
+            app=next((a for a in APPS if a["id"]==aid),None)
+            if not app: s.json({"error":"unknown"},400); return
+            if app.get("opkg"):
+                cmds=[f"mkdir -p /opt/etc/opkg",
+                      f"echo '{app['repo_line']}' > /opt/etc/opkg/{aid}.conf",
+                      f"opkg update","opkg install {app['opkg']}"]
+                out=""
+                for c in cmds:
+                    o,_=run(c,60); out+=o+"\n"
+                s.json({"status":"done","output":out.strip()})
+            elif app.get("install_cmd"):
+                o,_=run(app["install_cmd"],120)
+                s.json({"status":"done","output":o})
+            else: s.json({"error":"no install method"},400)
 
-        else:
-            self.send_json({"error": "not found"}, 404)
+        elif p=="/api/app/remove":
+            aid=b.get("app_id","")
+            app=next((a for a in APPS if a["id"]==aid),None)
+            if not app: s.json({"error":"unknown"},400); return
+            if app.get("opkg"):
+                o,_=run(f"opkg remove {app['opkg']} 2>&1",30)
+                run(f"rm -f /opt/etc/opkg/{aid}.conf",5)
+                s.json({"status":"done","output":o})
+            else: s.json({"error":"Manual removal needed"},400)
 
-    def log_message(self, fmt, *args): pass
+        elif p=="/api/app/control":
+            aid=b.get("app_id",""); act=b.get("action","status")
+            # Find service script
+            svc=None
+            app=next((a for a in APPS if a["id"]==aid),None)
+            if app:
+                for pat in app.get("svc_glob",[]):
+                    for f in glob.glob("/opt/etc/init.d/*"):
+                        try:
+                            if glob.fnmatch.fnmatch(os.path.basename(f),pat): svc=f; break
+                        except: pass
+                    if svc: break
+            if svc:
+                o,_=run(f'"{svc}" {act} 2>&1',15)
+                s.json({"status":"done","action":act,"output":o})
+            else: s.json({"error":"service not found"},404)
 
-print(f"Keenetic-RDCT WebUI: http://0.0.0.0:{PORT}", flush=True)
+        else: s.json({"error":"not found"},404)
+
+print(f"Keenetic-RDCT WebUI: http://0.0.0.0:{PORT}",flush=True)
 socketserver.TCPServer.allow_reuse_address = True
-with socketserver.TCPServer((BIND, PORT), Handler) as httpd:
-    httpd.serve_forever()
+with socketserver.TCPServer((BIND,PORT),H) as srv: srv.serve_forever()

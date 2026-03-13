@@ -202,14 +202,11 @@ code{background:var(--bg);padding:1px 5px;border-radius:3px;font-size:12px}
 
 <!-- SETTINGS -->
 <div id="p-settings" style="display:none"><div class="page-title" data-t="nav.settings">Настройки</div>
-<div class="section"><h2 data-t="set.config">Конфигурация</h2><pre id="setCfg">Загрузка...</pre></div>
+<div class="section" id="cfgForm">Загрузка...</div>
+<div class="section"><h2>JSON (raw)</h2><pre id="setCfg" style="max-height:300px;cursor:pointer" onclick="this.contentEditable=true;this.style.border='2px solid var(--accent)'"></pre>
+<div class="actions" style="margin-top:8px"><button class="btn btn-primary btn-sm" onclick="saveCfgRaw()">💾 Сохранить JSON</button></div></div>
 <div class="section"><h2 data-t="set.security">Безопасность</h2>
-<p style="color:var(--muted);font-size:13px;line-height:1.8">
-<span data-t="set.secInfo">WebUI доступен только в LAN. Используется Bearer Token аутентификация.<br>
-Роли: <b>admin</b> (полный доступ), <b>readonly</b> (только просмотр).<br>
-Опасные операции (restart/restore/delete) требуют <code>dangerous_ops=true</code> в конфиге.<br>
-Токен хранится в <code>var/.auth_token</code> (chmod 600).</span>
-</p></div></div>
+<p style="color:var(--muted);font-size:13px;line-height:1.8" data-t="set.secInfo">WebUI доступен только в LAN. Bearer Token аутентификация.<br>Роли: <b>admin</b> / <b>readonly</b>.<br>Опасные операции требуют <code>dangerous_ops=true</code>.</p></div></div>
 
 </div><!-- /main -->
 </div><!-- /app -->
@@ -439,14 +436,58 @@ else r=await apiPost('/api/app/control',{app_id:aid,action:act});
 el.textContent=r.output||r.status||JSON.stringify(r);
 setTimeout(()=>loadApps(),3000)}catch(e){el.textContent='Error: '+e.message}}
 
+let CFG={};
 async function loadSettings(){
-try{const c=await api('/api/config');
-$('#setCfg').innerHTML=`<textarea id="cfgEdit" style="width:100%;height:400px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:12px;font-family:monospace;font-size:12px;resize:vertical">${JSON.stringify(c,null,2)}</textarea>
-<div class="actions" style="margin-top:10px"><button class="btn btn-primary" onclick="saveCfg()">💾 Сохранить</button><button class="btn btn-ghost" onclick="loadSettings()">↩ Сбросить</button></div>`}catch{$('#setCfg').textContent='Ошибка'}}
+try{CFG=await api('/api/config');$('#setCfg').textContent=JSON.stringify(CFG,null,2);renderCfgForm(CFG)}catch{$('#setCfg').textContent='Ошибка';$('#cfgForm').textContent='Ошибка'}}
 
-async function saveCfg(){try{const d=JSON.parse($('#cfgEdit').value);
+function cfgField(label,id,type,val,opts){
+const desc=opts||'';
+if(type==='select'){
+let o='';for(const v of desc.split('|'))o+=`<option value="${v}" ${v===val?'selected':''}>${v}</option>`;
+return `<div style="margin:8px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><label style="min-width:200px;color:var(--muted);font-size:13px">${label}</label><select id="${id}" style="padding:5px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px">${o}</select></div>`}
+if(type==='bool')return `<div style="margin:8px 0;display:flex;align-items:center;gap:10px"><label style="min-width:200px;color:var(--muted);font-size:13px">${label}</label><input type="checkbox" id="${id}" ${val?'checked':''} style="width:18px;height:18px;accent-color:var(--accent)"></div>`;
+if(type==='number')return `<div style="margin:8px 0;display:flex;align-items:center;gap:10px"><label style="min-width:200px;color:var(--muted);font-size:13px">${label}</label><input type="number" id="${id}" value="${val||''}" style="width:100px;padding:5px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px"></div>`;
+return `<div style="margin:8px 0;display:flex;align-items:center;gap:10px"><label style="min-width:200px;color:var(--muted);font-size:13px">${label}</label><input type="text" id="${id}" value="${val||''}" style="flex:1;max-width:300px;padding:5px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px"></div>`}
+
+function renderCfgForm(c){
+const wb=c.webui||{};const gv=c.governor||{};
+let h='<h2>⚙️ Конфигуратор</h2>';
+h+='<div style="border-bottom:1px solid var(--border);padding:8px 0;margin-bottom:8px"><b>Основные</b></div>';
+h+=cfgField('Режим исследования','c_mode','select',c.research_mode||'medium','light|medium|full|extreme');
+h+=cfgField('Режим производительности','c_perf','select',c.performance_mode||'auto','lite|middle|hard|auto');
+h+=cfgField('Язык','c_lang','select',c.lang||'ru','ru|en');
+h+=cfgField('Readonly','c_ro','bool',c.readonly!==false);
+h+=cfgField('Debug','c_dbg','bool',!!c.debug);
+h+=cfgField('Опасные операции','c_danger','bool',!!c.dangerous_ops);
+h+='<div style="border-bottom:1px solid var(--border);padding:8px 0;margin:12px 0 8px"><b>WebUI</b></div>';
+h+=cfgField('Enabled','c_we','bool',wb.enabled!==false);
+h+=cfgField('Bind','c_wb','text',wb.bind||'0.0.0.0');
+h+=cfgField('Port start','c_wp1','number',wb.port_range_start||5000);
+h+=cfgField('Port end','c_wp2','number',wb.port_range_end||5099);
+h+='<div style="border-bottom:1px solid var(--border);padding:8px 0;margin:12px 0 8px"><b>Governor</b></div>';
+h+=cfgField('CPU limit %','c_gcpu','number',gv.cpu_limit_pct||70);
+h+=cfgField('RAM limit %','c_gram','number',gv.ram_limit_pct||80);
+h+=cfgField('Min disk free MB','c_gdisk','number',gv.min_disk_free_mb||50);
+h+='<div class="actions" style="margin-top:16px"><button class="btn btn-primary" onclick="saveCfgForm()">💾 Сохранить</button><button class="btn btn-ghost" onclick="loadSettings()">↩ Сбросить</button></div>';
+$('#cfgForm').innerHTML=h}
+
+async function saveCfgForm(){
+const c={config_version:CFG.config_version||1,
+research_mode:$('#c_mode').value,performance_mode:$('#c_perf').value,lang:$('#c_lang').value,
+readonly:$('#c_ro').checked,debug:$('#c_dbg').checked,dangerous_ops:$('#c_danger').checked,
+webui:{enabled:$('#c_we').checked,bind:$('#c_wb').value,port:null,
+port_range_start:+$('#c_wp1').value,port_range_end:+$('#c_wp2').value},
+governor:{cpu_limit_pct:+$('#c_gcpu').value,ram_limit_pct:+$('#c_gram').value,
+min_disk_free_mb:+$('#c_gdisk').value}};
+try{const r=await apiPost('/api/config',c);
+if(r.status==='saved'){alert('✅ Сохранено / Saved');loadSettings()}
+else alert('❌ '+(r.error||'Error'))}catch(e){alert('❌ '+e.message)}}
+
+async function saveCfgRaw(){
+try{const t=$('#setCfg').textContent;const d=JSON.parse(t);
 const r=await apiPost('/api/config',d);
-alert(r.status==='saved'?'✅ Сохранено':'❌ '+(r.error||'Ошибка'))}catch(e){alert('❌ JSON: '+e.message)}}
+if(r.status==='saved'){alert('✅ Сохранено');loadSettings()}
+else alert('❌ '+(r.error||'Error'))}catch(e){alert('❌ JSON: '+e.message)}}
 
 /* ========== INIT ========== */
 async function startRun(){
