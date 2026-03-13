@@ -320,7 +320,7 @@ h+=`<div class="section"><h2>${r.id} <span class="badge badge-ok">${sz}</span></
 <button class="btn btn-ghost btn-sm" onclick="viewSub('${r.id}','redaction')">${t('rep.redaction')}</button>
 <button class="btn btn-ghost btn-sm" onclick="viewSub('${r.id}','inventory')">${t('rep.inventory')}</button>
 <button class="btn btn-ghost btn-sm" onclick="viewSub('${r.id}','checks')">${t('rep.checks')}</button>
-<a class="btn btn-primary btn-sm" href="/api/report/${r.id}/download" target="_blank">⬇ ${LANG==='ru'?'Скачать':'Download'}</a>
+<a class="btn btn-primary btn-sm" href="/api/report/${r.id}/download?token=${T}" target="_blank">⬇ ${LANG==='ru'?'Скачать':'Download'}</a>
 <button class="btn btn-danger btn-sm" onclick="delReport('${r.id}')">🗑 ${LANG==='ru'?'Удалить':'Delete'}</button>
 </div>
 <pre id="rep-${r.id}" style="display:none"></pre></div>`}

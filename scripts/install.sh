@@ -116,11 +116,13 @@ install_deps() {
     log "Installing python3 (required for WebUI)..."
     log "Running opkg update..."
     opkg update 2>&1 | tail -3
-    log "Installing python3-light..."
-    if opkg install python3-light 2>&1 | tail -5; then
-      log "python3-light installed"
-    elif opkg install python3 2>&1 | tail -5; then
+    log "Installing python3 + dependencies..."
+    # python3-light lacks email module needed by http.server
+    # Install full python3, or light + email as fallback
+    if opkg install python3 2>&1 | tail -5; then
       log "python3 installed"
+    elif opkg install python3-light python3-email python3-logging python3-urllib python3-codecs 2>&1 | tail -5; then
+      log "python3-light + modules installed"
     else
       warn "Could not install python3 automatically."
       warn "Try manually: opkg update && opkg install python3-light"

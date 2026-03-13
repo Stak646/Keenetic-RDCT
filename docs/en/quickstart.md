@@ -1,27 +1,26 @@
 # Quick Start
 
 ## Install
-```shell
-curl -fsSL https://raw.githubusercontent.com/Stak646/Keenetic-RDCT/main/scripts/install.sh | sh
+```bash
+curl -fsSL https://raw.githubusercontent.com/Stak646/Keenetic-RDCT/main/scripts/install.sh -o /tmp/install.sh && sh /tmp/install.sh
 ```
 
-## Baseline Snapshot
-```shell
-keenetic-debug start --mode light --perf lite
-```
+## Run Collection
+Open WebUI: `http://<router_IP>:5000`
+Enter the token (shown during installation).
+Click ▶ Start — uses settings from configurator.
 
-## Incremental Snapshot
-```shell
-keenetic-debug start --mode medium --perf auto --snapshot-mode delta
+## CLI
+```bash
+/opt/keenetic-debug/cli/keenetic-debug start
+/opt/keenetic-debug/cli/keenetic-debug report list
 ```
 
 ## Download Report
-```shell
-keenetic-debug report list
-keenetic-debug report download <report_id>
-```
+In WebUI → Reports → ⬇ Download button.
 
-## Sanitize for Sharing
-```shell
-keenetic-debug sanitize <report_id>
+## Uninstall
+```bash
+curl -fsSL https://raw.githubusercontent.com/Stak646/Keenetic-RDCT/main/scripts/install.sh -o /tmp/install.sh && sh /tmp/install.sh
+# Choose option 3
 ```

@@ -1,30 +1,28 @@
 #!/bin/sh
-# Collector: wifi.clients
-set -eu
-BASE_DIR="${TOOL_BASE_DIR:-/opt/keenetic-debug}"
 WORKDIR="${COLLECTOR_WORKDIR:-.}"
 ARTIFACTS="$WORKDIR/artifacts"
-RESULT="$WORKDIR/result.json"
 mkdir -p "$ARTIFACTS"
-status="OK"; cmds_run=0; cmds_fail=0; skipped=""
-. "$BASE_DIR/modules/lib/json_writer.sh" 2>/dev/null || true
-. "$BASE_DIR/modules/lib/hash.sh" 2>/dev/null || true
-. "$BASE_DIR/modules/lib/safe_read.sh" 2>/dev/null || true
+status="OK"; cmds_run=0
 
-collect() { local cmd="$1" out="$2" fb="${3:-}"; local t=$(echo "$cmd"|awk '{print $1}'); if command -v "$t" >/dev/null 2>&1; then eval "$cmd" > "$ARTIFACTS/$out" 2>/dev/null && cmds_run=$((cmds_run+1)) || cmds_fail=$((cmds_fail+1)); elif [ -n "$fb" ]; then local ft=$(echo "$fb"|awk '{print $1}'); if command -v "$ft" >/dev/null 2>&1; then eval "$fb" > "$ARTIFACTS/$out" 2>/dev/null && cmds_run=$((cmds_run+1)); else cmds_fail=$((cmds_fail+1)); fi; else cmds_fail=$((cmds_fail+1)); fi; }
-read_file() { local src="$1" out="$2"; [ -r "$src" ] && head -c 524288 "$src" > "$ARTIFACTS/$out" 2>/dev/null && cmds_run=$((cmds_run+1)) || cmds_fail=$((cmds_fail+1)); }
+# ARP table
+cat /proc/net/arp > "$ARTIFACTS/arp_table.txt" 2>/dev/null && cmds_run=$((cmds_run+1)) || true
 
-### DATA ###
-for iface in $(iw dev 2>/dev/null | grep Interface | awk "{print \$2}"); do
-  collect "iw dev $iface station dump" "wifi_clients_${iface}.txt"
-done
-read_file "/proc/net/arp" "arp_table.txt"
+# iw station dump
+if command -v iw >/dev/null 2>&1; then
+  for iface in $(iw dev 2>/dev/null | awk '/Interface/{print $2}'); do
+    iw dev "$iface" station dump > "$ARTIFACTS/station_${iface}.txt" 2>/dev/null && cmds_run=$((cmds_run+1)) || true
+  done
+fi
 
-### RESULT ###
+# Keenetic: ndmc for client list
+if command -v ndmc >/dev/null 2>&1; then
+  ndmc -c "show associations" > "$ARTIFACTS/ndm_associations.txt" 2>/dev/null && cmds_run=$((cmds_run+1)) || true
+  ndmc -c "show ip hotspot host" > "$ARTIFACTS/ndm_hotspot_hosts.txt" 2>/dev/null && cmds_run=$((cmds_run+1)) || true
+fi
+
 out_bytes=$(du -sb "$ARTIFACTS" 2>/dev/null | awk '{print $1}' || echo 0)
 arts=""; for f in "$ARTIFACTS"/*; do [ -f "$f" ] && arts="${arts}\"artifacts/$(basename "$f")\","; done
-fp=""; command -v sha256sum >/dev/null 2>&1 && fp=$(find "$ARTIFACTS" -type f -exec sha256sum {} + 2>/dev/null | sha256sum | awk '{print $1}')
-cat > "$RESULT" << RESEOF
-{"schema_id":"result","schema_version":"1","collector_id":"wifi.clients","status":"$status","started_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)","finished_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)","duration_ms":0,"metrics":{"output_size_bytes":$out_bytes,"commands_run":$cmds_run,"commands_skipped":0,"commands_failed":$cmds_fail},"data":{},"artifacts":[${arts%,}],"errors":[],"fingerprint":"$fp"}
-RESEOF
+cat > "$WORKDIR/result.json" << REOF
+{"schema_id":"result","schema_version":"1","collector_id":"wifi.clients","status":"$status","metrics":{"output_size_bytes":$out_bytes,"commands_run":$cmds_run},"artifacts":[${arts%,}],"errors":[]}
+REOF
 exit 0

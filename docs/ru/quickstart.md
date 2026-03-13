@@ -1,27 +1,26 @@
 # Быстрый старт
 
 ## Установка
-```shell
-curl -fsSL https://raw.githubusercontent.com/Stak646/Keenetic-RDCT/main/scripts/install.sh | sh
+```bash
+curl -fsSL https://raw.githubusercontent.com/Stak646/Keenetic-RDCT/main/scripts/install.sh -o /tmp/install.sh && sh /tmp/install.sh
 ```
 
-## Базовый snapshot
-```shell
-keenetic-debug start --mode light --perf lite
-```
+## Запуск сбора
+Откройте WebUI: `http://<IP роутера>:5000`
+Введите токен (выведен при установке).
+Нажмите ▶ Запустить — сбор использует настройки из конфигуратора.
 
-## Инкрементальный snapshot
-```shell
-keenetic-debug start --mode medium --perf auto --snapshot-mode delta
+## CLI
+```bash
+/opt/keenetic-debug/cli/keenetic-debug start
+/opt/keenetic-debug/cli/keenetic-debug report list
 ```
 
 ## Скачать отчёт
-```shell
-keenetic-debug report list
-keenetic-debug report download <report_id>
-```
+В WebUI → Отчёты → кнопка ⬇ Скачать.
 
-## Очистить для передачи
-```shell
-keenetic-debug sanitize <report_id>
+## Удаление
+```bash
+curl -fsSL https://raw.githubusercontent.com/Stak646/Keenetic-RDCT/main/scripts/install.sh -o /tmp/install.sh && sh /tmp/install.sh
+# Выберите пункт 3
 ```

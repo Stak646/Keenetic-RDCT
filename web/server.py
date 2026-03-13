@@ -354,25 +354,47 @@ def run_collection(report_id, mode, perf):
             seen_ports = set()
             with open(ss_file) as f:
                 for line in f:
-                    # Only LISTEN (TCP) and UNCONN (UDP listening)
                     if "LISTEN" not in line and "UNCONN" not in line: continue
                     parts = line.split()
-                    if len(parts) < 5: continue
-                    local = parts[4]
+                    if len(parts) < 4: continue
+
+                    proto = parts[0]
+                    local = ""; proc = ""
+
+                    # Detect format: netstat vs ss
+                    # netstat: tcp  0  0  127.0.0.1:80  0.0.0.0:*  LISTEN  1234/nginx
+                    # ss:      LISTEN  0  128  127.0.0.1:80  0.0.0.0:*  users:(("nginx",pid=1234,fd=5))
+                    if proto in ("tcp","tcp6","udp","udp6"):
+                        # netstat format
+                        local = parts[3] if len(parts) > 3 else ""
+                        # Process: last column like "1234/nginx"
+                        for p in parts:
+                            if "/" in p and p[0].isdigit():
+                                proc = p.split("/",1)[1] if "/" in p else ""
+                                break
+                    elif parts[0] in ("LISTEN","UNCONN"):
+                        # ss format
+                        proto = "tcp" if "LISTEN" in line else "udp"
+                        local = parts[3] if len(parts) > 3 else ""
+                        if "users:" in line:
+                            try: proc = line.split('(("')[1].split('"')[0]
+                            except: pass
+                    else:
+                        continue
+
                     port = local.rsplit(":",1)[-1] if ":" in local else ""
                     bind = local.rsplit(":",1)[0] if ":" in local else ""
-                    proc = ""
-                    if "users:" in line:
-                        try: proc = line.split('(("')[1].split('"')[0]
-                        except: pass
-                    if port.isdigit():
-                        pk = f"{parts[0]}:{port}"
-                        if pk in seen_ports: continue
-                        seen_ports.add(pk)
-                        warn = []
-                        if bind in ("0.0.0.0","::","*"): warn.append("external_bind")
-                        inventory_entries.append({"port":int(port),"proto":parts[0],
-                            "bind_addr":bind,"process_name":proc,"warnings":warn})
+                    if not port or not port.isdigit(): continue
+
+                    pk = f"{proto}:{port}"
+                    if pk in seen_ports: continue
+                    seen_ports.add(pk)
+
+                    warn = []
+                    if bind in ("0.0.0.0","::","*","0.0.0.0"): warn.append("external_bind")
+
+                    inventory_entries.append({"port":int(port),"proto":proto,
+                        "bind_addr":bind,"process_name":proc,"warnings":warn})
         except: pass
     write_json("inventory.json", {"schema_id":"inventory","schema_version":"1",
         "report_id":report_id,"entries":inventory_entries,
@@ -688,19 +710,28 @@ class H(http.server.SimpleHTTPRequestHandler):
         elif p=="/api/app/install":
             aid=b.get("app_id","")
             app=next((a for a in APPS if a["id"]==aid),None)
-            if not app: s.json({"error":"unknown"},400); return
-            if app.get("opkg"):
-                cmds=[f"mkdir -p /opt/etc/opkg",
-                      f"echo '{app['repo_line']}' > /opt/etc/opkg/{aid}.conf",
-                      f"opkg update","opkg install {app['opkg']}"]
-                out=""
-                for c in cmds:
-                    o,_=run(c,60); out+=o+"\n"
-                s.json({"status":"done","output":out.strip()})
+            if not app: s.json({"error":"unknown app"},400); return
+            output_lines = []
+            if app.get("opkg") and app.get("repo_line"):
+                # Setup opkg repo
+                repo_conf = f"/opt/etc/opkg/{aid}.conf"
+                os.makedirs("/opt/etc/opkg", exist_ok=True)
+                with open(repo_conf, "w") as rf: rf.write(app["repo_line"] + "\n")
+                output_lines.append(f"Repo configured: {repo_conf}")
+                # Update
+                o,_ = run("opkg update 2>&1", 60)
+                output_lines.append(o)
+                # Install
+                o,rc = run(f"opkg install {app['opkg']} 2>&1", 120)
+                output_lines.append(o)
+                if rc != 0:
+                    output_lines.append(f"ERROR: opkg install returned {rc}")
+                s.json({"status":"done" if rc==0 else "error","output":"\n".join(output_lines)})
             elif app.get("install_cmd"):
-                o,_=run(app["install_cmd"],120)
-                s.json({"status":"done","output":o})
-            else: s.json({"error":"no install method"},400)
+                o,rc = run(app["install_cmd"] + " 2>&1", 180)
+                s.json({"status":"done" if rc==0 else "error","output":o})
+            else:
+                s.json({"error":"No install method for this app. Install manually."},400)
 
         elif p=="/api/app/remove":
             aid=b.get("app_id","")

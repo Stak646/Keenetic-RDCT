@@ -1,58 +1,34 @@
-# Руководство по установке
+# Установка / Обновление / Удаление
 
-## Быстрая установка (онлайн)
+## Требования
+- Keenetic с Entware (opkg, /opt)
+- python3 (устанавливается автоматически)
+- Архитектуры: mipsel, mips, aarch64
+- Свободное место: от 10 МБ
 
-```shell
-curl -fsSL https://raw.githubusercontent.com/Stak646/Keenetic-RDCT/main/scripts/install.sh | sh
+## Онлайн установка
+```bash
+curl -fsSL https://raw.githubusercontent.com/Stak646/Keenetic-RDCT/main/scripts/install.sh -o /tmp/install.sh && sh /tmp/install.sh
 ```
 
-Или через wget:
-```shell
-wget -qO- https://raw.githubusercontent.com/Stak646/Keenetic-RDCT/main/scripts/install.sh | sh
-```
-
-## Параметры
-
-```shell
-sh install.sh --prefix /opt/keenetic-debug --channel stable
-sh install.sh --offline bundle.tar.gz
-sh install.sh --upgrade
-sh install.sh --uninstall --yes
-sh install.sh --verify
-sh install.sh --repair
-sh install.sh --dry-run
-sh install.sh --no-webui          # Только CLI
-sh install.sh --no-autostart      # Без автозапуска
-```
-
-## Оффлайн-установка
-
-1. Скачайте bundle для вашей архитектуры на ПК
-2. Скопируйте на USB-накопитель
-3. Установите: `sh install.sh --offline /mnt/usb/bundle.tar.gz`
+Установщик автоматически:
+1. Определяет архитектуру и наличие Entware
+2. Устанавливает python3 (если отсутствует)
+3. Скачивает проект с GitHub
+4. Генерирует токен авторизации
+5. Создаёт конфигурацию
+6. Запускает WebUI на свободном порту
 
 ## Обновление
-
-```shell
-sh install.sh --upgrade
-keenetic-debug update rollback    # Откат
-```
+Запустите установщик и выберите пункт 2 (Обновить).
 
 ## Удаление
+Запустите установщик и выберите пункт 3 (Удалить).
 
-```shell
-sh install.sh --uninstall --yes   # Удалить всё
-sh install.sh --uninstall         # Сохранить отчёты
+## Управление сервисом
+```bash
+/opt/etc/init.d/S99keeneticrdct start
+/opt/etc/init.d/S99keeneticrdct stop
+/opt/etc/init.d/S99keeneticrdct restart
+/opt/etc/init.d/S99keeneticrdct status
 ```
-
-## Безопасность поставки
-
-Все загрузки проверяются по SHA-256 из `release-manifest.json`.
-При несовпадении хэша — установка прерывается.
-
-## Токен авторизации
-
-- Генерируется при установке: `var/.auth_token` (права: 0600)
-- Просмотр: `cat /opt/keenetic-debug/var/.auth_token`
-- Ротация: `keenetic-debug webui token rotate`
-- Роли: `admin` (полный доступ), `readonly` (только просмотр)
