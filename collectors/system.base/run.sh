@@ -1,95 +1,49 @@
 #!/bin/sh
-# collectors/system.base/run.sh
-# Collects basic system information: CPU, memory, load, uptime, mounts, processes
 set -eu
+WORKDIR="${COLLECTOR_WORKDIR:-.}"
+ARTIFACTS="$WORKDIR/artifacts"
+mkdir -p "$ARTIFACTS"
+status="OK"; cmds_run=0; cmds_fail=0
 
-COLLECTOR_ID="system.base"
-WORK_DIR="${WORK_DIR:-.}"
-RESEARCH_MODE="${RESEARCH_MODE:-medium}"
-STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date +%s)"
+c() { local cmd="$1" out="$2"; eval "$cmd" > "$ARTIFACTS/$out" 2>/dev/null && cmds_run=$((cmds_run+1)) || cmds_fail=$((cmds_fail+1)); }
+r() { [ -r "$1" ] && cp "$1" "$ARTIFACTS/$2" 2>/dev/null && cmds_run=$((cmds_run+1)) || true; }
 
-check_cmd() { command -v "$1" >/dev/null 2>&1; }
+c "uname -a" "uname.txt"
+c "cat /proc/version" "proc_version.txt"
+r "/proc/cpuinfo" "proc_cpuinfo.txt"
+r "/proc/meminfo" "proc_meminfo.txt"
+r "/proc/loadavg" "proc_loadavg.txt"
+r "/proc/uptime" "proc_uptime.txt"
+r "/proc/stat" "proc_stat.txt"
+r "/proc/mounts" "proc_mounts.txt"
+r "/proc/interrupts" "proc_interrupts.txt"
+r "/proc/modules" "proc_modules.txt"
+r "/proc/cmdline" "proc_cmdline.txt"
+r "/proc/filesystems" "proc_filesystems.txt"
+c "ps w" "ps.txt"
+c "df -h" "df.txt"
+c "mount" "mount.txt"
+c "dmesg" "dmesg_full.txt"
+c "dmesg | tail -100" "dmesg_tail.txt"
+c "date" "date.txt"
+c "uptime" "uptime_human.txt"
+c "free" "free.txt"
+c "cat /etc/TZ" "timezone.txt"
 
-mkdir -p "$WORK_DIR/artifacts"
+# Keenetic model
+c "ndmc -c 'show version'" "ndm_version.txt"
+c "ndmc -c 'show interface'" "ndm_interfaces.txt"
 
-# --- Collect data ---
-STATUS="OK"
-REASON=""
-DATA_PARTS=""
+# NTP status
+c "ndmc -c 'show clock'" "ndm_clock.txt"
 
-# uname
-if check_cmd uname; then
-  uname -a > "$WORK_DIR/artifacts/uname.txt" 2>/dev/null || true
-fi
+# Sysctl network params
+c "cat /proc/sys/net/ipv4/ip_forward" "ip_forward.txt"
+c "cat /proc/sys/net/netfilter/nf_conntrack_max" "conntrack_max.txt"
 
-# /proc files
-for proc_file in cpuinfo meminfo loadavg uptime version mounts; do
-  src="/proc/$proc_file"
-  if [ -r "$src" ]; then
-    cp "$src" "$WORK_DIR/artifacts/proc_${proc_file}.txt" 2>/dev/null || true
-  fi
-done
-
-# ps snapshot
-if check_cmd ps; then
-  ps -ef > "$WORK_DIR/artifacts/ps.txt" 2>/dev/null || \
-  ps w > "$WORK_DIR/artifacts/ps.txt" 2>/dev/null || true
-fi
-
-# df (disk usage)
-if check_cmd df; then
-  df -h > "$WORK_DIR/artifacts/df.txt" 2>/dev/null || \
-  df > "$WORK_DIR/artifacts/df.txt" 2>/dev/null || true
-fi
-
-# mount
-if check_cmd mount; then
-  mount > "$WORK_DIR/artifacts/mount.txt" 2>/dev/null || true
-fi
-
-# dmesg (if accessible and mode >= medium)
-if [ "$RESEARCH_MODE" != "light" ]; then
-  if check_cmd dmesg; then
-    dmesg 2>/dev/null | tail -200 > "$WORK_DIR/artifacts/dmesg_tail.txt" 2>/dev/null || true
-  fi
-fi
-
-# Calculate output size
-OUTPUT_SIZE=0
-if check_cmd du; then
-  OUTPUT_SIZE=$(du -sb "$WORK_DIR/artifacts" 2>/dev/null | cut -f1 || echo 0)
-fi
-
-FINISHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date +%s)"
-
-# --- Build artifact list ---
-ARTIFACTS_JSON="["
-first=true
-for f in "$WORK_DIR"/artifacts/*; do
-  [ -f "$f" ] || continue
-  fname=$(basename "$f")
-  fsize=$(wc -c < "$f" 2>/dev/null | tr -d ' ' || echo 0)
-  if [ "$first" = true ]; then first=false; else ARTIFACTS_JSON="$ARTIFACTS_JSON,"; fi
-  ARTIFACTS_JSON="$ARTIFACTS_JSON{\"path\":\"artifacts/$fname\",\"size_bytes\":$fsize}"
-done
-ARTIFACTS_JSON="$ARTIFACTS_JSON]"
-
-# --- Write result.json ---
-cat > "$WORK_DIR/result.json" << RESULT_EOF
-{
-  "schema_id": "keenetic-debug.collector.result",
-  "schema_version": 1,
-  "collector_id": "$COLLECTOR_ID",
-  "status": "$STATUS",
-  "reason": "$REASON",
-  "started_at": "$STARTED_AT",
-  "finished_at": "$FINISHED_AT",
-  "duration_ms": 0,
-  "output_size_bytes": $OUTPUT_SIZE,
-  "data": {},
-  "artifacts": $ARTIFACTS_JSON,
-  "fingerprint": {}
-}
-RESULT_EOF
-
+out_bytes=$(du -sb "$ARTIFACTS" 2>/dev/null | awk '{print $1}' || echo 0)
+arts=""; for f in "$ARTIFACTS"/*; do [ -f "$f" ] && arts="${arts}\"artifacts/$(basename "$f")\","; done
+cat > "$WORKDIR/result.json" << REOF
+{"schema_id":"result","schema_version":"1","collector_id":"system.base","status":"$status","started_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)","finished_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)","duration_ms":0,"metrics":{"output_size_bytes":$out_bytes,"commands_run":$cmds_run,"commands_failed":$cmds_fail},"data":{},"artifacts":[${arts%,}],"errors":[],"fingerprint":""}
+REOF
 exit 0

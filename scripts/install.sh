@@ -114,12 +114,25 @@ install_deps() {
 
   if [ "$HAS_PYTHON" = false ]; then
     log "Installing python3 (required for WebUI)..."
-    opkg update >/dev/null 2>&1
-    opkg install python3-light 2>/dev/null || opkg install python3 2>/dev/null || {
-      warn "Could not install python3. WebUI will not be available."
-      warn "Try manually: opkg install python3-light"
-    }
+    log "Running opkg update..."
+    opkg update 2>&1 | tail -3
+    log "Installing python3-light..."
+    if opkg install python3-light 2>&1 | tail -5; then
+      log "python3-light installed"
+    elif opkg install python3 2>&1 | tail -5; then
+      log "python3 installed"
+    else
+      warn "Could not install python3 automatically."
+      warn "Try manually: opkg update && opkg install python3-light"
+    fi
+    # Run ldconfig to update library cache
+    ldconfig 2>/dev/null || /opt/sbin/ldconfig 2>/dev/null || true
     command -v python3 >/dev/null 2>&1 && HAS_PYTHON=true
+    if [ "$HAS_PYTHON" = true ]; then
+      log "python3 ready: $(python3 --version 2>&1)"
+    else
+      warn "python3 still not found after install attempt"
+    fi
   fi
 }
 
@@ -243,6 +256,7 @@ setup_config() {
   "debug": false,
   "readonly": true,
   "dangerous_ops": false,
+  "archive_format": "tar.gz",
   "webui": {
     "enabled": true,
     "bind": "0.0.0.0",

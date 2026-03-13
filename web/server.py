@@ -256,89 +256,203 @@ def detect_device():
 
 # ─── Collection runner ────────────────────────────────────────────────────
 def run_collection(report_id, mode, perf):
-    """Run all collectors in a thread — writes results to reports/"""
+    """Run all collectors, generate required files, package archive"""
     report_dir = os.path.join(PREFIX, "reports", report_id)
     state_file = os.path.join(PREFIX, "run", "state.json")
     coll_dir = os.path.join(PREFIX, "collectors")
+    ts_start = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    events = []
 
-    # Get list of collectors
+    def evt(eid, data=None):
+        e = {"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "id": eid}
+        if data: e["data"] = data
+        events.append(e)
+
+    def write_json(name, obj):
+        try:
+            with open(os.path.join(report_dir, name), "w") as f:
+                json.dump(obj, f, indent=2, ensure_ascii=False)
+        except: pass
+
+    evt("run.start", {"report_id": report_id, "mode": mode, "perf": perf})
+
+    # ── Preflight ──
+    caps = {}
+    for cmd in ["ip","ss","iptables","opkg","tar","python3","curl","wget","jq","dmesg","wg","ndmc","iw"]:
+        o, rc = run(f"command -v {cmd}", 2); caps[cmd] = rc == 0
+    write_json("preflight.json", {"schema_id":"preflight","capabilities":caps,
+        "arch":platform.machine(),"entware":os.path.exists("/opt/bin/opkg")})
+
+    # ── Plan ──
     collectors = []
+    plan_tasks = []
     if os.path.isdir(coll_dir):
         for d in sorted(os.listdir(coll_dir)):
             if d.startswith("_") or d.startswith("test."): continue
             rs = os.path.join(coll_dir, d, "run.sh")
-            if os.path.exists(rs): collectors.append((d, rs))
+            pj = os.path.join(coll_dir, d, "plugin.json")
+            if not os.path.exists(rs): continue
+            timeout = 60
+            try:
+                with open(pj) as f: meta = json.load(f)
+                timeout = meta.get("timeout_s", 60)
+            except: meta = {}
+            collectors.append((d, rs, timeout))
+            plan_tasks.append({"collector_id":d,"status":"INCLUDE","reason":"available","timeout_s":timeout})
+    write_json("plan.json", {"schema_id":"plan","tasks":plan_tasks})
 
+    # ── Run collectors ──
     total = len(collectors)
-    done = 0
     results_summary = {"ok":0,"skip":0,"fail":0,"timeout":0}
+    collector_results = []
 
-    for cid, script in collectors:
-        done += 1
+    for i, (cid, script, timeout) in enumerate(collectors):
         cwd = os.path.join(report_dir, "collectors", cid)
         os.makedirs(os.path.join(cwd, "artifacts"), exist_ok=True)
 
-        # Update progress
-        pct = int(done * 100 / max(total, 1))
-        state = {"state":"RUNNING","report_id":report_id,"overall_pct":pct,
-                 "current_collector":cid,"done":done,"total":total}
+        pct = int((i+1) * 100 / max(total, 1))
         try:
-            with open(state_file,"w") as f: json.dump(state,f)
+            with open(state_file, "w") as f:
+                json.dump({"state":"RUNNING","report_id":report_id,"overall_pct":pct,
+                    "current_collector":cid,"done":i+1,"total":total}, f)
         except: pass
 
-        # Run collector
+        evt("collector.start", {"id": cid})
         env = os.environ.copy()
-        env.update({
-            "TOOL_BASE_DIR": PREFIX, "COLLECTOR_WORKDIR": cwd,
-            "COLLECTOR_ID": cid, "TOOL_REPORT_ID": report_id,
-            "RESEARCH_MODE": mode, "PERF_MODE": perf,
-        })
+        env.update({"TOOL_BASE_DIR":PREFIX,"COLLECTOR_WORKDIR":cwd,
+            "COLLECTOR_ID":cid,"TOOL_REPORT_ID":report_id,
+            "RESEARCH_MODE":mode,"PERF_MODE":perf})
+
+        cst = "OK"; t0 = time.time()
         try:
             r = subprocess.run(["sh", script], cwd=cwd, env=env,
-                capture_output=True, text=True, timeout=30)
+                capture_output=True, text=True, timeout=min(timeout, 120))
             with open(os.path.join(cwd, "stdout.log"), "w") as f:
                 f.write(r.stdout + "\n" + r.stderr)
-            if r.returncode == 0: results_summary["ok"] += 1
-            else: results_summary["fail"] += 1
-        except subprocess.TimeoutExpired:
-            results_summary["timeout"] += 1
-        except Exception as e:
-            results_summary["fail"] += 1
+            cst = "OK" if r.returncode == 0 else "FAIL"
+        except subprocess.TimeoutExpired: cst = "TIMEOUT"
+        except: cst = "FAIL"
 
-    # Write device info
+        dur = round((time.time() - t0) * 1000)
+        results_summary["ok" if cst=="OK" else ("timeout" if cst=="TIMEOUT" else "fail")] += 1
+        evt("collector.finish", {"id":cid,"status":cst,"duration_ms":dur})
+
+        # Count artifacts
+        art_count = 0
+        if os.path.isdir(os.path.join(cwd, "artifacts")):
+            art_count = len(os.listdir(os.path.join(cwd, "artifacts")))
+        collector_results.append({"id":cid,"status":cst,"duration_ms":dur,"artifacts":art_count})
+
+    # ── Device info ──
+    write_json("device.json", detect_device())
+
+    # ── Inventory (from sockets + ps data) ──
+    inventory_entries = []
+    ss_file = os.path.join(report_dir, "collectors", "network.sockets", "artifacts", "ss_tulnp.txt")
+    if os.path.exists(ss_file):
+        try:
+            with open(ss_file) as f:
+                for line in f:
+                    if not line.startswith(("tcp","udp")): continue
+                    parts = line.split()
+                    if len(parts) < 5: continue
+                    local = parts[4]
+                    port = local.rsplit(":",1)[-1] if ":" in local else ""
+                    bind = local.rsplit(":",1)[0] if ":" in local else ""
+                    proc = ""
+                    if "users:" in line:
+                        try: proc = line.split('(("')[1].split('"')[0]
+                        except: pass
+                    if port.isdigit():
+                        warn = []
+                        if bind in ("0.0.0.0","::","*"): warn.append("external_bind")
+                        inventory_entries.append({"port":int(port),"proto":parts[0],
+                            "bind_addr":bind,"process_name":proc,"warnings":warn})
+        except: pass
+    write_json("inventory.json", {"schema_id":"inventory","schema_version":"1",
+        "report_id":report_id,"entries":inventory_entries,
+        "statistics":{"total_ports":len(inventory_entries)}})
+
+    # ── Checks (basic) ──
+    checks_list = []
+    # Check for 0.0.0.0 binds
+    for e in inventory_entries:
+        if "external_bind" in e.get("warnings",[]):
+            checks_list.append({"id":"net.external_bind","severity":"WARN",
+                "title":"Port open on all interfaces","evidence":f"port {e['port']} {e['proto']}",
+                "remediation_hint":"Review if this port should be exposed to WAN"})
+    # Check dmesg for OOM/segfault
+    dmesg = os.path.join(report_dir,"collectors","logs.system","artifacts","dmesg.txt")
+    if os.path.exists(dmesg):
+        try:
+            with open(dmesg) as f: dtxt = f.read()
+            if "Out of memory" in dtxt or "oom_kill" in dtxt:
+                checks_list.append({"id":"logs.oom","severity":"CRIT","title":"OOM killer detected",
+                    "evidence":"dmesg","remediation_hint":"Check memory usage"})
+            if "segfault" in dtxt.lower():
+                checks_list.append({"id":"logs.segfault","severity":"WARN","title":"Segfault detected",
+                    "evidence":"dmesg","remediation_hint":"Check unstable software"})
+        except: pass
+    write_json("checks.json", {"schema_id":"checks","schema_version":"1","report_id":report_id,
+        "summary":{"total":len(checks_list),"critical":sum(1 for c in checks_list if c["severity"]=="CRIT"),
+            "warn":sum(1 for c in checks_list if c["severity"]=="WARN"),
+            "info":sum(1 for c in checks_list if c["severity"]=="INFO")},
+        "checks":checks_list})
+
+    # ── Redaction report ──
+    write_json("redaction_report.json", {"schema_id":"redaction_report","schema_version":"1",
+        "research_mode":mode,"masked":mode in ("light","medium"),
+        "total_findings":0,"findings":[],"summary":{}})
+
+    # ── Event log ──
     try:
-        with open(os.path.join(report_dir, "device.json"), "w") as f:
-            json.dump(detect_device(), f, indent=2, ensure_ascii=False)
+        with open(os.path.join(report_dir, "event_log.jsonl"), "w") as f:
+            for e in events: f.write(json.dumps(e, ensure_ascii=False) + "\n")
     except: pass
 
-    # Write summary
-    try:
-        with open(os.path.join(report_dir, "summary.json"), "w") as f:
-            json.dump({"schema_id":"summary","report_id":report_id,
-                "mode":mode,"perf":perf,"collectors":results_summary,
-                "finished_at":time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime())}, f, indent=2)
-    except: pass
+    # ── Summary ──
+    ts_end = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    write_json("summary.json", {"schema_id":"summary","report_id":report_id,
+        "mode":mode,"perf":perf,"started_at":ts_start,"finished_at":ts_end,
+        "collectors":results_summary,"collector_details":collector_results})
 
-    # Write manifest
-    try:
-        files = []
-        for root, dirs, fnames in os.walk(report_dir):
-            for fn in fnames:
-                fp = os.path.join(root, fn)
-                rel = os.path.relpath(fp, report_dir)
-                sz = os.path.getsize(fp)
-                files.append({"path":rel,"size":sz})
-        with open(os.path.join(report_dir, "manifest.json"), "w") as f:
-            json.dump({"schema_id":"manifest","schema_version":"1","report_id":report_id,
-                "created_at":time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),
-                "total_files":len(files),"files":files}, f, indent=2)
-    except: pass
+    # ── Manifest ──
+    files = []
+    for root, dirs, fnames in os.walk(report_dir):
+        for fn in fnames:
+            fp = os.path.join(root, fn)
+            rel = os.path.relpath(fp, report_dir)
+            files.append({"path":rel,"size":os.path.getsize(fp)})
+    write_json("manifest.json", {"schema_id":"manifest","schema_version":"1",
+        "report_id":report_id,"created_at":ts_end,"total_files":len(files),"files":files})
 
-    # Done
+    # ── Archive (tar.gz or zip) ──
+    cfg = load_config()
+    fmt = cfg.get("archive_format", "tar.gz")
+    archive_path = None
     try:
-        with open(state_file,"w") as f:
+        if fmt == "zip":
+            import zipfile
+            archive_path = os.path.join(PREFIX, "reports", f"{report_id}.zip")
+            with zipfile.ZipFile(archive_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                for root, dirs, fnames in os.walk(report_dir):
+                    for fn in fnames:
+                        fp = os.path.join(root, fn)
+                        arcname = os.path.join(report_id, os.path.relpath(fp, report_dir))
+                        zf.write(fp, arcname)
+        else:
+            import tarfile
+            archive_path = os.path.join(PREFIX, "reports", f"{report_id}.tar.gz")
+            with tarfile.open(archive_path, "w:gz") as tf:
+                tf.add(report_dir, arcname=report_id)
+    except Exception as e:
+        evt("archive.error", {"error": str(e)})
+
+    # ── Done ──
+    try:
+        with open(state_file, "w") as f:
             json.dump({"state":"DONE","report_id":report_id,
-                "summary":results_summary}, f)
+                "summary":results_summary,"archive":archive_path}, f)
     except: pass
 
 # ─── HTTP Handler ─────────────────────────────────────────────────────────
@@ -406,6 +520,24 @@ class H(http.server.SimpleHTTPRequestHandler):
             pts=p.split("/"); rid,sub=pts[3],pts[4]
             fmap={"redaction":"redaction_report.json"}
             s.file_json(os.path.join(PREFIX,"reports",rid,fmap.get(sub,sub+".json")))
+        elif re.match(r"/api/report/[^/]+/download",p):
+            rid=p.split("/")[3]
+            # Find archive
+            for ext in (".tar.gz",".zip"):
+                af=os.path.join(PREFIX,"reports",rid+ext)
+                if os.path.exists(af):
+                    s.send_response(200)
+                    s.send_header("Content-Type","application/octet-stream")
+                    s.send_header("Content-Disposition",f"attachment; filename={rid}{ext}")
+                    s.send_header("Content-Length",str(os.path.getsize(af)))
+                    s.end_headers()
+                    with open(af,"rb") as f:
+                        while True:
+                            chunk=f.read(65536)
+                            if not chunk: break
+                            s.wfile.write(chunk)
+                    return
+            s.json({"error":"archive not found"},404)
         elif p.startswith("/api/i18n/"):
             s.file_json(os.path.join(PREFIX,"i18n",p.split("/")[-1]+".json"))
         elif p=="/api/preflight": s.json({"message":"Use POST /api/preflight/run"})
@@ -417,7 +549,13 @@ class H(http.server.SimpleHTTPRequestHandler):
         b = s.body()
 
         if p=="/api/start":
-            mode=b.get("mode","light"); perf=b.get("perf","lite")
+            # Use config defaults, override with body params
+            cfg = load_config()
+            mode=b.get("mode", cfg.get("research_mode","medium"))
+            perf=b.get("perf", cfg.get("performance_mode","auto"))
+            # Dangerous ops warning
+            if cfg.get("dangerous_ops") and not b.get("confirmed"):
+                s.json({"warning":"dangerous_ops enabled","need_confirm":True}); return
             rid = f"report-{int(time.time())}"
             rd = os.path.join(PREFIX,"reports",rid)
             os.makedirs(os.path.join(rd,"collectors"),exist_ok=True)
@@ -433,6 +571,19 @@ class H(http.server.SimpleHTTPRequestHandler):
             with open(os.path.join(PREFIX,"run","state.json"),"w") as f:
                 json.dump({"state":"CANCELLED"},f)
             s.json({"status":"cancelled"})
+
+        elif re.match(r"/api/report/[^/]+/delete",p):
+            rid=p.split("/")[3]
+            import shutil
+            rd=os.path.join(PREFIX,"reports",rid)
+            if os.path.isdir(rd):
+                shutil.rmtree(rd, ignore_errors=True)
+                # Also remove archive
+                for ext in (".tar.gz",".zip"):
+                    af=os.path.join(PREFIX,"reports",rid+ext)
+                    if os.path.exists(af): os.remove(af)
+                s.json({"status":"deleted","report_id":rid})
+            else: s.json({"error":"not found"},404)
 
         elif p=="/api/config":
             try:

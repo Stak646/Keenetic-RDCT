@@ -1,40 +1,33 @@
 #!/bin/sh
-# Collector: mirror.full
 set -eu
-BASE_DIR="${TOOL_BASE_DIR:-/opt/keenetic-debug}"
 WORKDIR="${COLLECTOR_WORKDIR:-.}"
 ARTIFACTS="$WORKDIR/artifacts"
-RESULT="$WORKDIR/result.json"
 mkdir -p "$ARTIFACTS"
-status="OK"; cmds_run=0; cmds_fail=0; skipped=""
-. "$BASE_DIR/modules/lib/json_writer.sh" 2>/dev/null || true
-. "$BASE_DIR/modules/lib/hash.sh" 2>/dev/null || true
-. "$BASE_DIR/modules/lib/safe_read.sh" 2>/dev/null || true
+status="OK"; cmds_run=0; cmds_fail=0
 
-collect() { local cmd="$1" out="$2" fb="${3:-}"; local t=$(echo "$cmd"|awk '{print $1}'); if command -v "$t" >/dev/null 2>&1; then eval "$cmd" > "$ARTIFACTS/$out" 2>/dev/null && cmds_run=$((cmds_run+1)) || cmds_fail=$((cmds_fail+1)); elif [ -n "$fb" ]; then local ft=$(echo "$fb"|awk '{print $1}'); if command -v "$ft" >/dev/null 2>&1; then eval "$fb" > "$ARTIFACTS/$out" 2>/dev/null && cmds_run=$((cmds_run+1)); else cmds_fail=$((cmds_fail+1)); fi; else cmds_fail=$((cmds_fail+1)); fi; }
-read_file() { local src="$1" out="$2"; [ -r "$src" ] && head -c 524288 "$src" > "$ARTIFACTS/$out" 2>/dev/null && cmds_run=$((cmds_run+1)) || cmds_fail=$((cmds_fail+1)); }
+# Denylist: binaries, libraries, caches, our own tool, large blobs
+EXCLUDE_PATTERNS='\.pyc$|\.pyo$|\.so\.|\.so$|\.a$|\.o$|/lib/python|/share/zoneinfo|/share/terminfo|/share/locale|/share/i18n|/lib/opkg|/var/opkg|/var/cache|/var/run|/var/lock|/lib/ld-|/lib/libc|/lib/libm|/lib/libdl|/lib/libpthread|/lib/librt|/lib/libnsl|/lib/libresolv|/lib/libcrypt|/lib/libutil|/lib/libgcc|/lib/libstdc|/lib/libssl|/lib/libcrypto|/lib/libcurl|/lib/libpython|/lib/libsqlite|/lib/libreadline|/lib/libncurses|/lib/libffi|/lib/libbz2|/lib/liblzma|/lib/libuuid|/lib/libz\.|/bin/busybox|/bin/python|/bin/curl|/bin/jq|/bin/opkg|/sbin/|/usr/bin/|/usr/lib/|keenetic-debug/tmp|keenetic-debug/reports|keenetic-debug/run|keenetic-debug/logs|\.tar\.gz$|\.zip$|\.gz$|\.bak$'
 
-### DATA ###
-. "$BASE_DIR/modules/lib/safe_read.sh" 2>/dev/null || true
-MIRROR_MAX_FILES=${MIRROR_MAX_FILES:-10000}
-MIRROR_MAX_DEPTH=${MIRROR_MAX_DEPTH:-10}
-WORKDIR_ABS=$(cd "$WORKDIR" 2>/dev/null && pwd)
-find /opt -maxdepth $MIRROR_MAX_DEPTH -type f \
-  ! -path "*/keenetic-debug/tmp/*" ! -path "*/keenetic-debug/reports/*" \
-  ! -path "*/keenetic-debug/run/*" ! -name "*.tar.gz" ! -name "*.zip" \
-  2>/dev/null | head -$MIRROR_MAX_FILES | while read -r f; do
-  case "$f" in "$WORKDIR_ABS"*) continue ;; esac
+MAX_FILES=500
+MAX_FILE_SIZE=1048576  # 1MB per file
+count=0
+
+find /opt -maxdepth 6 -type f 2>/dev/null | grep -vE "$EXCLUDE_PATTERNS" | head -$MAX_FILES | while read -r f; do
+  [ ! -r "$f" ] && continue
   fsize=$(wc -c < "$f" 2>/dev/null || echo 0)
-  [ "$fsize" -gt 10485760 ] && continue
-  rel=$(echo "$f" | sed "s|^/opt/||" | tr "/" "_")
-  cp "$f" "$ARTIFACTS/$rel" 2>/dev/null && cmds_run=$((cmds_run+1))
+  [ "$fsize" -gt "$MAX_FILE_SIZE" ] && continue
+  # Skip binary files (check first bytes)
+  if file "$f" 2>/dev/null | grep -qiE 'ELF|executable|shared object|archive'; then
+    continue
+  fi
+  rel=$(echo "$f" | sed 's|^/opt/||' | tr '/' '_')
+  cp "$f" "$ARTIFACTS/$rel" 2>/dev/null && cmds_run=$((cmds_run + 1))
+  count=$((count + 1))
 done
 
-### RESULT ###
 out_bytes=$(du -sb "$ARTIFACTS" 2>/dev/null | awk '{print $1}' || echo 0)
 arts=""; for f in "$ARTIFACTS"/*; do [ -f "$f" ] && arts="${arts}\"artifacts/$(basename "$f")\","; done
-fp=""; command -v sha256sum >/dev/null 2>&1 && fp=$(find "$ARTIFACTS" -type f -exec sha256sum {} + 2>/dev/null | sha256sum | awk '{print $1}')
-cat > "$RESULT" << RESEOF
-{"schema_id":"result","schema_version":"1","collector_id":"mirror.full","status":"$status","started_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)","finished_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)","duration_ms":0,"metrics":{"output_size_bytes":$out_bytes,"commands_run":$cmds_run,"commands_skipped":0,"commands_failed":$cmds_fail},"data":{},"artifacts":[${arts%,}],"errors":[],"fingerprint":"$fp"}
-RESEOF
+cat > "$WORKDIR/result.json" << REOF
+{"schema_id":"result","schema_version":"1","collector_id":"mirror.full","status":"$status","started_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)","finished_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)","duration_ms":0,"metrics":{"output_size_bytes":$out_bytes,"commands_run":$cmds_run,"commands_skipped":0,"commands_failed":$cmds_fail},"data":{},"artifacts":[${arts%,}],"errors":[],"fingerprint":""}
+REOF
 exit 0

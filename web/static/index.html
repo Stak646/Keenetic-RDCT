@@ -320,9 +320,17 @@ h+=`<div class="section"><h2>${r.id} <span class="badge badge-ok">${sz}</span></
 <button class="btn btn-ghost btn-sm" onclick="viewSub('${r.id}','redaction')">${t('rep.redaction')}</button>
 <button class="btn btn-ghost btn-sm" onclick="viewSub('${r.id}','inventory')">${t('rep.inventory')}</button>
 <button class="btn btn-ghost btn-sm" onclick="viewSub('${r.id}','checks')">${t('rep.checks')}</button>
+<a class="btn btn-primary btn-sm" href="/api/report/${r.id}/download" target="_blank">⬇ ${LANG==='ru'?'Скачать':'Download'}</a>
+<button class="btn btn-danger btn-sm" onclick="delReport('${r.id}')">🗑 ${LANG==='ru'?'Удалить':'Delete'}</button>
 </div>
 <pre id="rep-${r.id}" style="display:none"></pre></div>`}
 $('#repList').innerHTML=h}catch{$('#repList').textContent='Ошибка'}}
+
+async function delReport(id){
+if(!confirm(LANG==='ru'?'Удалить отчёт '+id+'?':'Delete report '+id+'?'))return;
+try{const r=await apiPost('/api/report/'+id+'/delete',{});
+if(r.status==='deleted'){loadReports();loadDash()}
+else alert('❌ '+(r.error||'Error'))}catch(e){alert('❌ '+e.message)}}
 
 async function viewSub(id,sub){
 const el=$('#rep-'+id);if(!el)return;
@@ -459,6 +467,7 @@ h+=cfgField('Язык','c_lang','select',c.lang||'ru','ru|en');
 h+=cfgField('Readonly','c_ro','bool',c.readonly!==false);
 h+=cfgField('Debug','c_dbg','bool',!!c.debug);
 h+=cfgField('Опасные операции','c_danger','bool',!!c.dangerous_ops);
+h+=cfgField('Формат архива','c_fmt','select',c.archive_format||'tar.gz','tar.gz|zip');
 h+='<div style="border-bottom:1px solid var(--border);padding:8px 0;margin:12px 0 8px"><b>WebUI</b></div>';
 h+=cfgField('Enabled','c_we','bool',wb.enabled!==false);
 h+=cfgField('Bind','c_wb','text',wb.bind||'0.0.0.0');
@@ -472,7 +481,7 @@ h+='<div class="actions" style="margin-top:16px"><button class="btn btn-primary"
 $('#cfgForm').innerHTML=h}
 
 async function saveCfgForm(){
-const c={config_version:CFG.config_version||1,
+const c={config_version:CFG.config_version||1,archive_format:$('#c_fmt').value,
 research_mode:$('#c_mode').value,performance_mode:$('#c_perf').value,lang:$('#c_lang').value,
 readonly:$('#c_ro').checked,debug:$('#c_dbg').checked,dangerous_ops:$('#c_danger').checked,
 webui:{enabled:$('#c_we').checked,bind:$('#c_wb').value,port:null,
@@ -491,14 +500,12 @@ else alert('❌ '+(r.error||'Error'))}catch(e){alert('❌ JSON: '+e.message)}}
 
 /* ========== INIT ========== */
 async function startRun(){
-const mode=prompt(LANG==='ru'?'Режим исследования (light/medium/full/extreme):':'Research mode (light/medium/full/extreme):','light');
-if(!mode)return;
-const perf=prompt(LANG==='ru'?'Режим производительности (lite/middle/hard/auto):':'Performance mode (lite/middle/hard/auto):','lite');
-if(!perf)return;
-try{const r=await apiPost('/api/start',{mode,perf});
-if(r.report_id)alert((LANG==='ru'?'✅ Сбор запущен: ':'✅ Started: ')+r.report_id);
-else alert('❌ '+(r.error||JSON.stringify(r)));
-setTimeout(()=>{go('progress')},1000)}catch(e){alert('❌ '+e.message)}}
+try{
+const r=await apiPost('/api/start',{confirmed:true});
+if(r.warning&&r.need_confirm){if(!confirm('⚠️ '+r.warning+'\nContinue?'))return;await apiPost('/api/start',{confirmed:true})}
+if(r.report_id){go('progress')}
+else if(r.error){alert('❌ '+r.error)}
+}catch(e){alert('❌ '+e.message)}}
 
 function initApp(){applyI18n();loadDash();setInterval(()=>{if(CUR_PAGE==='dash')loadDash();if(CUR_PAGE==='progress')loadProgress()},5000)}
 

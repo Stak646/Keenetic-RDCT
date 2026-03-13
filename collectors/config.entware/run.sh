@@ -1,81 +1,49 @@
 #!/bin/sh
-# Collector: config.entware — Entware Config
 set -eu
-BASE_DIR="${TOOL_BASE_DIR:-/opt/keenetic-debug}"
 WORKDIR="${COLLECTOR_WORKDIR:-.}"
 ARTIFACTS="$WORKDIR/artifacts"
-RESULT="$WORKDIR/result.json"
-MODE="${RESEARCH_MODE:-medium}"
-
-. "$BASE_DIR/modules/lib/json_writer.sh" 2>/dev/null || true
-. "$BASE_DIR/modules/lib/hash.sh" 2>/dev/null || true
-. "$BASE_DIR/modules/lib/safe_read.sh" 2>/dev/null || true
-
 mkdir -p "$ARTIFACTS"
+status="OK"; cmds_run=0; cmds_fail=0
 
-status="OK"
-cmds_run=0
-cmds_fail=0
-warnings=""
-skipped=""
-
-collect() {
-  local cmd="$1" out="$2" fb="${3:-}"
-  local tool=$(echo "$cmd" | awk '{print $1}')
-  if command -v "$tool" >/dev/null 2>&1; then
-    eval "$cmd" > "$ARTIFACTS/$out" 2>/dev/null && cmds_run=$((cmds_run+1)) || cmds_fail=$((cmds_fail+1))
-  elif [ -n "$fb" ]; then
-    local fbtool=$(echo "$fb" | awk '{print $1}')
-    if command -v "$fbtool" >/dev/null 2>&1; then
-      eval "$fb" > "$ARTIFACTS/$out" 2>/dev/null && cmds_run=$((cmds_run+1)) || cmds_fail=$((cmds_fail+1))
-    else cmds_fail=$((cmds_fail+1)); fi
-  else cmds_fail=$((cmds_fail+1)); fi
-}
-
-read_file() {
-  local src="$1" out="$2" max_kb="${3:-512}"
-  if [ -r "$src" ]; then
-    head -c $((max_kb*1024)) "$src" > "$ARTIFACTS/$out" 2>/dev/null && cmds_run=$((cmds_run+1))
-  else cmds_fail=$((cmds_fail+1)); skipped="${skipped}$src,"; fi
-}
-
-# Sandbox support
-if [ "${TOOL_SANDBOX:-0}" = "1" ]; then
-  FIX="${SANDBOX_FIXTURES:-$BASE_DIR/tests/fixtures/sandbox}"
-fi
-
-### DATA COLLECTION ###
 if [ -d /opt/etc ]; then
-  find /opt/etc -maxdepth 3 -type f -size -1M 2>/dev/null | head -500 | while read -r f; do
-    rel=$(echo "$f" | sed "s|^/opt/etc/||" | tr "/" "_")
-    cp "$f" "$ARTIFACTS/$rel" 2>/dev/null && cmds_run=$((cmds_run+1))
+  # Collect known config files
+  for f in \
+    /opt/etc/*.conf /opt/etc/*.cfg /opt/etc/*.ini /opt/etc/*.json \
+    /opt/etc/config/* \
+    /opt/etc/profile /opt/etc/passwd /opt/etc/group /opt/etc/shells \
+    /opt/etc/entware_release /opt/etc/opkg.conf \
+    /opt/etc/dnsmasq.conf /opt/etc/dnsmasq.d/* \
+    /opt/etc/nginx/*.conf /opt/etc/nginx/conf.d/* \
+    /opt/etc/crontab /opt/etc/crontabs/* \
+    /opt/etc/nfqws*.conf /opt/etc/nfqws*/*.conf \
+    /opt/etc/tpws*.conf \
+    /opt/etc/opkg/*.conf \
+    /opt/etc/ndm/*/*.sh \
+    /opt/etc/init.d/S* \
+    /opt/etc/hosts /opt/etc/resolv.conf \
+    /opt/etc/shadow /opt/etc/gshadow \
+    /opt/etc/ssl/openssl.cnf \
+    /opt/etc/HydraRoute* /opt/etc/hydra* \
+    /opt/etc/magitrickle* /opt/etc/MagiTrickle* \
+    /opt/etc/awg* \
+  ; do
+    [ -f "$f" ] || continue
+    [ ! -r "$f" ] && continue
+    fsize=$(wc -c < "$f" 2>/dev/null || echo 0)
+    [ "$fsize" -gt 524288 ] && continue  # skip >512KB
+    rel=$(echo "$f" | sed 's|^/opt/etc/||' | tr '/' '_')
+    cp "$f" "$ARTIFACTS/$rel" 2>/dev/null && cmds_run=$((cmds_run + 1))
   done
+
+  # Also enumerate /opt/etc structure
+  find /opt/etc -maxdepth 3 -type f 2>/dev/null | head -200 > "$ARTIFACTS/_file_list.txt" && cmds_run=$((cmds_run + 1))
 else
   status="SKIP"
 fi
 
-### RESULT ###
 out_bytes=$(du -sb "$ARTIFACTS" 2>/dev/null | awk '{print $1}' || echo 0)
-arts=""
-for f in "$ARTIFACTS"/*; do [ -f "$f" ] && arts="${arts}\"artifacts/$(basename "$f")\","; done
-
-fp=""
-if command -v sha256sum >/dev/null 2>&1; then
-  fp=$(find "$ARTIFACTS" -type f -exec sha256sum {} + 2>/dev/null | sha256sum | awk '{print $1}')
-fi
-
-cat > "$RESULT" << RESEOF
-{
-  "schema_id":"result","schema_version":"1",
-  "collector_id":"config.entware","status":"$status",
-  "started_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)",
-  "finished_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)",
-  "duration_ms":0,
-  "metrics":{"output_size_bytes":$out_bytes,"commands_run":$cmds_run,"commands_skipped":0,"commands_failed":$cmds_fail},
-  "data":{},
-  "artifacts":[${arts%,}],
-  "errors":[],"warnings":[],"skipped_items":[$(echo "$skipped" | sed 's/,$//' | sed 's/\([^,]*\)/"\1"/g')],
-  "fingerprint":"$fp"
-}
-RESEOF
+arts=""; for f in "$ARTIFACTS"/*; do [ -f "$f" ] && arts="${arts}\"artifacts/$(basename "$f")\","; done
+cat > "$WORKDIR/result.json" << REOF
+{"schema_id":"result","schema_version":"1","collector_id":"config.entware","status":"$status","started_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)","finished_at":"$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)","duration_ms":0,"metrics":{"output_size_bytes":$out_bytes,"commands_run":$cmds_run,"commands_failed":$cmds_fail},"data":{},"artifacts":[${arts%,}],"errors":[],"fingerprint":""}
+REOF
 exit 0
