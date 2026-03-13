@@ -28,49 +28,55 @@ def load_config():
 # ─── Known apps ───────────────────────────────────────────────────────────
 APPS = [
   {"id":"nfqws-keenetic", "name":"NFQWS Keenetic","icon":"🛡️",
-   "desc_ru":"Обход блокировок (оригинал Anonym-tsk)","desc_en":"DPI bypass (original)",
-   "opkg":"nfqws-keenetic","repo_line":"src/gz nfqws-keenetic https://anonym-tsk.github.io/nfqws-keenetic/all",
+   "desc_ru":"Обход блокировок (оригинал Anonym-tsk)","desc_en":"DPI bypass (original by Anonym-tsk)",
+   "install_cmd":"curl -fsSL https://anonym-tsk.github.io/nfqws-keenetic/install.sh -o /tmp/nfqws_install.sh && sh /tmp/nfqws_install.sh",
+   "remove_cmd":"curl -fsSL https://anonym-tsk.github.io/nfqws-keenetic/uninstall.sh -o /tmp/nfqws_uninstall.sh && sh /tmp/nfqws_uninstall.sh",
    "svc_glob":["S51nfqws*","*nfqws-keenetic*"],"proc_grep":["nfqws"],
+   "file_check":["/opt/etc/init.d/S51nfqws","/opt/usr/bin/nfqws"],
    "conflicts":[]},
 
   {"id":"nfqws2-keenetic","name":"NFQWS2 Keenetic","icon":"🛡️",
-   "desc_ru":"Обход блокировок v2 (улучшенная)","desc_en":"DPI bypass v2 (improved)",
-   "opkg":"nfqws2-keenetic","repo_line":"src/gz nfqws2-keenetic https://nfqws.github.io/nfqws2-keenetic/all",
+   "desc_ru":"Обход блокировок v2 (улучшенная)","desc_en":"DPI bypass v2 (improved fork)",
+   "install_cmd":"curl -fsSL https://nfqws.github.io/nfqws2-keenetic/install.sh -o /tmp/nfqws2_install.sh && sh /tmp/nfqws2_install.sh",
+   "remove_cmd":"curl -fsSL https://nfqws.github.io/nfqws2-keenetic/uninstall.sh -o /tmp/nfqws2_uninstall.sh && sh /tmp/nfqws2_uninstall.sh",
    "svc_glob":["S51nfqws2*","*nfqws2*"],"proc_grep":["nfqws"],
+   "file_check":["/opt/etc/init.d/S51nfqws2"],
    "conflicts":["nfqws-keenetic"]},
 
   {"id":"nfqws-keenetic-web","name":"NFQWS Keenetic Web","icon":"🌐",
    "desc_ru":"Веб-интерфейс для NFQWS","desc_en":"Web UI for NFQWS",
-   "opkg":"nfqws-keenetic-web","repo_line":"src/gz nfqws-keenetic-web https://nfqws.github.io/nfqws-keenetic-web/all",
-   "svc_glob":["*nfqws*web*"],"proc_grep":["php-fpm","php","nfqws.*web"],
+   "install_cmd":"curl -fsSL https://nfqws.github.io/nfqws-keenetic-web/install.sh -o /tmp/nfqws_web_install.sh && sh /tmp/nfqws_web_install.sh",
+   "remove_cmd":"curl -fsSL https://nfqws.github.io/nfqws-keenetic-web/uninstall.sh -o /tmp/nfqws_web_uninstall.sh && sh /tmp/nfqws_web_uninstall.sh",
+   "svc_glob":["*nfqws*web*"],"proc_grep":["php","nfqws.*web"],
+   "file_check":["/opt/etc/nfqws-keenetic-web"],
    "conflicts":[]},
 
   {"id":"hydraroute","name":"HydraRoute Neo","icon":"🐉",
    "desc_ru":"Маршрутизация доменов через VPN","desc_en":"Domain-based VPN routing",
-   "opkg":None,
-   "install_cmd":"curl -fsSL https://raw.githubusercontent.com/Ground-Zerro/HydraRoute/main/install.sh | sh",
-   "svc_glob":["*[Hh]ydra*","*hydraroute*","S52hydra*","S99hydra*"],
-   "file_check":["/opt/etc/hydra","/opt/etc/HydraRoute","/opt/sbin/hydra","/opt/bin/hydra"],
+   "install_cmd":"curl -fsSL https://raw.githubusercontent.com/Ground-Zerro/HydraRoute/main/install.sh -o /tmp/hydra_install.sh && sh /tmp/hydra_install.sh",
+   "remove_cmd":"curl -fsSL https://raw.githubusercontent.com/Ground-Zerro/HydraRoute/main/install.sh -o /tmp/hydra_install.sh && sh /tmp/hydra_install.sh uninstall",
+   "svc_glob":["*[Hh]ydra*","S52hydra*","S99hydra*"],
    "proc_grep":["hydra","HydraRoute"],
+   "file_check":["/opt/etc/hydra","/opt/etc/HydraRoute","/opt/sbin/hydra","/opt/apps/HydraRoute"],
    "conflicts":["magitrickle"],
-   "legacy_glob":["*[Hh]ydra*[Cc]lassic*","*[Hh]ydra*[Rr]elic*"]},
+   "legacy_glob":["*[Cc]lassic*","*[Rr]elic*"]},
 
   {"id":"magitrickle","name":"MagiTrickle","icon":"🎩",
    "desc_ru":"Точечная маршрутизация по доменам","desc_en":"Domain-based traffic routing",
-   "opkg":None,
-   "install_cmd":"curl -fsSL https://raw.githubusercontent.com/MagiTrickle/MagiTrickle/main/install.sh | sh",
+   "install_cmd":"curl -fsSL https://raw.githubusercontent.com/MagiTrickle/MagiTrickle/master/install.sh -o /tmp/magi_install.sh && sh /tmp/magi_install.sh",
+   "remove_cmd":"curl -fsSL https://raw.githubusercontent.com/MagiTrickle/MagiTrickle/master/install.sh -o /tmp/magi_install.sh && sh /tmp/magi_install.sh uninstall",
    "svc_glob":["*[Mm]agi[Tt]rickle*","*magitrickle*"],
-   "file_check":["/opt/etc/magitrickle","/opt/bin/magitrickle","/opt/sbin/magitrickle"],
    "proc_grep":["magitrickle","MagiTrickle"],
+   "file_check":["/opt/etc/magitrickle","/opt/apps/MagiTrickle","/opt/sbin/magitrickle"],
    "conflicts":["hydraroute"]},
 
   {"id":"awg-manager","name":"AWG Manager","icon":"🔐",
    "desc_ru":"Менеджер туннелей AmneziaWG","desc_en":"AmneziaWG tunnel manager",
-   "opkg":None,
-   "install_cmd":"curl -fsSL https://raw.githubusercontent.com/hoaxisr/awg-manager/main/install.sh | sh",
+   "install_cmd":"curl -fsSL https://raw.githubusercontent.com/hoaxisr/awg-manager/main/install.sh -o /tmp/awg_install.sh && sh /tmp/awg_install.sh",
+   "remove_cmd":"curl -fsSL https://raw.githubusercontent.com/hoaxisr/awg-manager/main/install.sh -o /tmp/awg_install.sh && sh /tmp/awg_install.sh uninstall",
    "svc_glob":["*awg*","*amnezia*"],
-   "file_check":["/opt/etc/awg","/opt/etc/awg-manager"],
    "proc_grep":["awg","amnezia"],
+   "file_check":["/opt/etc/awg","/opt/etc/awg-manager","/opt/apps/awg-manager"],
    "conflicts":[]},
 ]
 
@@ -86,15 +92,7 @@ def detect_app_status():
              "conflict_warning": "", "upgrade_hint": "", "svc_path": ""}
 
         # ── Check installed ──
-        # 1) opkg
-        if app.get("opkg"):
-            out, rc = run(f"opkg status {app['opkg']} 2>/dev/null")
-            if "install ok installed" in out or "Status: install" in out:
-                a["installed"] = True
-                for line in out.split("\n"):
-                    if line.startswith("Version:"): a["version"] = line.split(":",1)[1].strip()
-
-        # 2) init.d service files
+        # 1) init.d service files
         if not a["installed"]:
             for pat in app.get("svc_glob", []):
                 for f in initd_files:
@@ -144,9 +142,7 @@ def detect_app_status():
                 if other["id"] != cid: continue
                 # Quick check if conflict is installed
                 c_installed = False
-                if other.get("opkg"):
-                    out2, _ = run(f"opkg status {other['opkg']} 2>/dev/null | head -3")
-                    if "install" in out2: c_installed = True
+                # Check conflict via file_check
                 if not c_installed:
                     for fp in other.get("file_check", []):
                         if os.path.exists(fp): c_installed = True; break
@@ -711,37 +707,49 @@ class H(http.server.SimpleHTTPRequestHandler):
             aid=b.get("app_id","")
             app=next((a for a in APPS if a["id"]==aid),None)
             if not app: s.json({"error":"unknown app"},400); return
-            output_lines = []
-            if app.get("opkg") and app.get("repo_line"):
-                # Setup opkg repo
-                repo_conf = f"/opt/etc/opkg/{aid}.conf"
-                os.makedirs("/opt/etc/opkg", exist_ok=True)
-                with open(repo_conf, "w") as rf: rf.write(app["repo_line"] + "\n")
-                output_lines.append(f"Repo configured: {repo_conf}")
-                # Update
-                o,_ = run("opkg update 2>&1", 60)
-                output_lines.append(o)
-                # Install
-                o,rc = run(f"opkg install {app['opkg']} 2>&1", 120)
-                output_lines.append(o)
-                if rc != 0:
-                    output_lines.append(f"ERROR: opkg install returned {rc}")
-                s.json({"status":"done" if rc==0 else "error","output":"\n".join(output_lines)})
-            elif app.get("install_cmd"):
-                o,rc = run(app["install_cmd"] + " 2>&1", 180)
-                s.json({"status":"done" if rc==0 else "error","output":o})
-            else:
-                s.json({"error":"No install method for this app. Install manually."},400)
+            out = []
+            def _r(cmd, t=120):
+                o,rc = run(cmd, t); out.append(f"$ {cmd}"); 
+                if o: out.append(o)
+                return rc
+
+            # Ensure curl + wget-ssl (both needed for HTTPS)
+            o_curl,_ = run("command -v curl", 3)
+            if not o_curl:
+                out.append("=== Installing curl (required for HTTPS) ===")
+                _r("opkg update 2>&1", 60)
+                _r("opkg install curl ca-bundle 2>&1", 60)
+            # Fix opkg HTTPS: replace wget-nossl with wget-ssl (one-time)
+            o_wssl,_ = run("opkg status wget-ssl 2>/dev/null | grep -c 'install ok'", 5)
+            if o_wssl.strip() != "1":
+                out.append("=== Fixing opkg HTTPS support (wget-ssl) ===")
+                _r("opkg update 2>&1", 60)
+                _r("opkg install wget-ssl 2>&1", 60)
+                # Remove conflicting broken HTTPS repo confs
+                import glob as _gl
+                for cf in _gl.glob("/opt/etc/opkg/nfqws*.conf"):
+                    try: os.remove(cf); out.append(f"Removed broken conf: {cf}")
+                    except: pass
+
+            if not app.get("install_cmd"):
+                s.json({"error":"No install method defined"},400); return
+
+            out.append(f"=== Installing {app['name']} ===")
+            rc = _r(app["install_cmd"] + " 2>&1", 300)
+            s.json({"status":"done" if rc==0 else "error","output":"\n".join(out)})
 
         elif p=="/api/app/remove":
             aid=b.get("app_id","")
             app=next((a for a in APPS if a["id"]==aid),None)
             if not app: s.json({"error":"unknown"},400); return
-            if app.get("opkg"):
-                o,_=run(f"opkg remove {app['opkg']} 2>&1",30)
-                run(f"rm -f /opt/etc/opkg/{aid}.conf",5)
-                s.json({"status":"done","output":o})
-            else: s.json({"error":"Manual removal needed"},400)
+            out = []
+            if app.get("remove_cmd"):
+                o,rc = run(app["remove_cmd"] + " 2>&1", 120)
+                out.append(o)
+                run(f"rm -f /opt/etc/opkg/{aid}.conf", 5)
+                s.json({"status":"done","output":"\n".join(out)})
+            else:
+                s.json({"error":"No removal script. Remove manually."},400)
 
         elif p=="/api/app/control":
             aid=b.get("app_id",""); act=b.get("action","status")
@@ -761,6 +769,12 @@ class H(http.server.SimpleHTTPRequestHandler):
             else: s.json({"error":"service not found"},404)
 
         else: s.json({"error":"not found"},404)
+
+# Cleanup broken opkg HTTPS repo confs from failed installs
+import glob as _g
+for _cf in _g.glob("/opt/etc/opkg/nfqws*.conf") + _g.glob("/opt/etc/opkg/nfqws2*.conf"):
+    try: os.remove(_cf)
+    except: pass
 
 print(f"Keenetic-RDCT WebUI: http://0.0.0.0:{PORT}",flush=True)
 socketserver.TCPServer.allow_reuse_address = True

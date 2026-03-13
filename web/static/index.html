@@ -432,7 +432,7 @@ ${a.installed?`<button class="btn btn-success btn-sm" onclick="appAction('${a.id
 <button class="btn btn-warn btn-sm" onclick="appAction('${a.id}','restart')">🔄</button>
 <button class="btn btn-ghost btn-sm" onclick="appAction('${a.id}','remove')">🗑</button>`:''}
 </div>
-<pre id="app-out-${a.id}" style="display:none;margin-top:8px;max-height:200px"></pre></div>`}
+<pre id="app-out-${a.id}" style="display:none;margin-top:8px;max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;font-size:11px;padding:8px;background:rgba(0,0,0,0.3);border-radius:4px"></pre></div>`}
 $('#appList').innerHTML=h}catch(e){$('#appList').innerHTML='<p style="color:var(--red)">'+e.message+'</p>'}}
 
 async function appAction(aid,act){
